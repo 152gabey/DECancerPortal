@@ -1,4 +1,61 @@
 # DEcancer Pipelines
+
+## Repository layout
+
+The original analysis pipelines remain at the repository root and in `src/`.
+The portal stack is organised as follows:
+
+```text
+backend/
+  app/
+    config.py       # environment-based settings
+    database.py     # MySQL Connector/Python connection helpers
+    main.py         # FastAPI application and health endpoints
+frontend/
+  index.html
+  styles.css
+  app.js
+database/
+  init.sql          # starter MySQL schema
+docker-compose.yml # local MySQL service
+```
+
+This separation keeps reproducible research scripts independent from the
+portal service while providing a place to add API routes and client features.
+
+## Portal stack quick start
+
+1. Copy `.env.example` to `.env` and change credentials for a non-local
+   deployment.
+2. Start MySQL:
+
+   ```sh
+   docker compose up -d mysql
+   ```
+
+3. Create a portal virtual environment and install the API dependencies:
+
+   ```sh
+   python -m venv .venv
+   . .venv/bin/activate
+   python -m pip install -r backend/requirements.txt
+   ```
+
+4. Start the FastAPI development server:
+
+   ```sh
+   uvicorn backend.app.main:app --reload
+   ```
+
+   The API is available at `http://127.0.0.1:8000`. Check
+   `http://127.0.0.1:8000/api/health` for liveness and
+   `http://127.0.0.1:8000/api/health/database` for MySQL connectivity.
+
+5. Serve `frontend/` with any static web server during development, for
+   example `python -m http.server 8080 --directory frontend`. Configure that
+   server to proxy `/api` to the FastAPI service, or open the client from the
+   same origin when the API serves the frontend.
+
 # Installation
 Create a virtual environment and install the required dependencies.
 
