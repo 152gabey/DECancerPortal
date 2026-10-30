@@ -59,3 +59,8 @@ Thumbs.db
 
 # Tests
 .coverage
+
+# Environment files
+.venv
+.env
+.vscode

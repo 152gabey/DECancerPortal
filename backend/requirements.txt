@@ -1,4 +1,0 @@
-fastapi>=0.110,<1
-mysql-connector-python>=8.3,<10
-python-dotenv>=1.0,<2
-uvicorn[standard]>=0.29,<1

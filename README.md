@@ -23,14 +23,22 @@ docker-compose.yml # local MySQL service
 This separation keeps reproducible research scripts independent from the
 portal service while providing a place to add API routes and client features.
 
+# Usage
+
 ## Portal stack quick start
 
 1. Copy `.env.example` to `.env` and change credentials for a non-local
    deployment.
+
+2. Initialise the DECancer database:
+   ```sh
+   mysql -u root -p < database/init.sql
+   ```
+
 2. Start MySQL:
 
    ```sh
-   docker compose up -d mysql
+   mysql -h 127.0.0.1 -u root -p --protocol=TCP
    ```
 
 3. Create a portal virtual environment and install the API dependencies:
@@ -38,8 +46,12 @@ portal service while providing a place to add API routes and client features.
    ```sh
    python -m venv .venv
    . .venv/bin/activate
-   python -m pip install -r backend/requirements.txt
+   pip install --upgrade pip
+   pip install -r requirements.txt
    ```
+
+   The dependency pins support Python 3.15.2. Use a fresh virtual environment
+   so older NumPy and SciPy installations are not reused.
 
 4. Start the FastAPI development server:
 
@@ -56,17 +68,6 @@ portal service while providing a place to add API routes and client features.
    server to proxy `/api` to the FastAPI service, or open the client from the
    same origin when the API serves the frontend.
 
-# Installation
-Create a virtual environment and install the required dependencies.
-
-```
-python -m venv venv
-venv/bin/activate
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-# Usage
 ## Nanoparticles
 Processed data is provided in `perseus_imputation/` for each of the 5 SPIONS and diluted plasma (DP). Note here that hyperparameters need to be specified for each algorithm which can be added to `src/parameters.py` when performing hyperparameter optimisation. Also not included is the steps taken for feature selection. Implementation fits between running the pipeline initially and before hyperparameter tuning found in `main.py`.
 

@@ -1,4 +1,7 @@
-CREATE TABLE IF NOT EXISTS portal_samples (
+CREATE DATABASE IF NOT EXISTS decancer;
+USE decancer;
+
+CREATE TABLE IF NOT EXISTS samples (
     id INT AUTO_INCREMENT PRIMARY KEY,
     sample_name VARCHAR(255) NOT NULL,
     classification VARCHAR(255) NOT NULL,
