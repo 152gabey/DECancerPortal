@@ -52,25 +52,15 @@ cancer_types = [
     CancerType.PANCANCER,
 ]
 
-classification_modes = [
-    ClassificationMode.CANCER_HEALTHY,
-    ClassificationMode.CANCER_OTHERCANCERS,
-    ClassificationMode.CANCER_REST,
-]
+classification_modes = [ClassificationMode.CANCER_HEALTHY]
 
 classifiers = {
-    RandomForest: [Parameter(RandomForestClassifier, *el) for el in Classifier.RF.value],
-    LogReg: [Parameter(LogisticRegression, *el) for el in Classifier.LR.value],
-    MultiLayerPerceptron: [Parameter(MLPClassifier, *el) for el in Classifier.MLP.value],
-    SupportVectorMachine: [Parameter(SVC, *el) for el in Classifier.SVM.value],
+    RandomForest: [Parameter(RandomForestClassifier, *el) for el in Classifier.RF.value]
 }
 
 kde_methods = [KDEMethod.NONE]
 
-model_modes = [
-    ModelMode.PROTEINS_ONLY,
-    ModelMode.FULL_MODEL,
-]
+model_modes = [ModelMode.FULL_MODEL]
 
 filter_modes = [
     FilterMode.POST_T_TEST,
@@ -128,11 +118,6 @@ elif PIPELINE_FLAG == PipelineMode.VALIDATING and VALIDATION_FLAG == ValidationM
 
     kde_methods = [KDEMethod.NONE]
 
-    model_modes = [
-        ModelMode.PROTEINS_ONLY,
-        ModelMode.FULL_MODEL,
-    ]
-
     filter_modes = [
         FilterMode.POST_T_TEST,
         FilterMode.EVERY_PROTEIN,
@@ -170,7 +155,7 @@ print(f"Total time taken: {time.time() - start} seconds.")
 if PIPELINE_FLAG == PipelineMode.VALIDATING:
     if VALIDATION_FLAG == ValidationMode.RECURSIVE_FEATURE_ELIMINATION:
         ttest = TTest()
-        with Parallel(n_jobs=-1, verbose=50) as parallel:
+        with Parallel(n_jobs=-1, prefer="threads", verbose=50) as parallel:
             delayed_funcs = [delayed(ttest.rfe_t_test)(cancer.value) for cancer in cancer_types]
             parallel(delayed_funcs)
     elif VALIDATION_FLAG == ValidationMode.HYPERPARAMETER_OPTIMISATION:

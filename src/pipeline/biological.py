@@ -90,7 +90,7 @@ class Biological(SharedPipeline):
         full_protein_sets: dict[str, dict] = {}
         for collection in self.collections:
             full_protein_sets[collection] = {}
-            with ExcelWriter(path) as writer:  # type: ignore[abstract]
+            with ExcelWriter(path, engine="openpyxl") as writer:  # type: ignore[abstract]
                 for class_num in range(1, 17):
                     full_protein_sets[collection][class_num] = {}
                     for kde in self.kde_methods:

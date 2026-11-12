@@ -4,6 +4,7 @@ import os
 import pprint
 from abc import ABC
 from abc import abstractmethod
+from copy import deepcopy
 from itertools import combinations
 from itertools import islice
 from typing import Any
@@ -62,6 +63,28 @@ if TYPE_CHECKING:
 
 
 pp = pprint.PrettyPrinter(indent=2, width=200, compact=True, sort_dicts=False)
+
+
+def _train_model_parameters(
+    hyperparameters: dict[str, Any],
+    model: ModelEstimator,
+    data: DataFrame,
+    options: dict[str, Any],
+    rfe: bool,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Train one parameter set without serializing the parent pipeline."""
+    model = deepcopy(model)
+    print(hyperparameters)
+    for i, (train_set, validation_set) in enumerate(
+        mc_cv.split(data, y=data.index.get_level_values(level="classification"))
+    ):
+        frames, x_valid, y_valid = model.preprocess(train_set, validation_set, **options)
+        if rfe:
+            model.train_rfe(frames, x_valid, y_valid, i, **hyperparameters)
+        else:
+            model.train(frames, x_valid, y_valid, i, **hyperparameters)
+
+    return hyperparameters, model.train_info
 
 
 class FunctionNotCompatibleError(Exception):
@@ -151,12 +174,21 @@ class SharedPipeline(ABC):
             A 2D list of parameter names for each classifier.
         """
         return [
-            ["alpha", "hidden_layer_sizes", "early_stopping"],
-            ["penalty", "C", "solver"],
-            ["C", "gamma", "kernel"],
-            ["n_estimators", "max_features", "max_depth", "criterion"],
-            ["max_features", "max_depth", "criterion", "splitter"],
-            ["n_estimators", "max_depth", "learning_rate", "reg_lambda"],
+            ["hidden_layer_sizes", "alpha", "learning_rate_init", "early_stopping", "max_iter", "random_state"],
+            ["C", "class_weight", "max_iter", "solver", "penalty", "random_state"],
+            ["kernel", "C", "gamma", "class_weight", "probability", "random_state"],
+            ["n_estimators", "max_depth", "max_features", "min_samples_leaf", "class_weight", "random_state"],
+            ["criterion", "max_depth", "min_samples_leaf", "max_features", "class_weight", "random_state"],
+            [
+                "n_estimators",
+                "max_depth",
+                "learning_rate",
+                "min_child_weight",
+                "subsample",
+                "colsample_bytree",
+                "reg_lambda",
+                "random_state",
+            ],
         ]
 
     @property
@@ -212,7 +244,7 @@ class SharedPipeline(ABC):
         best_params: dict[str, dict] = {}
         excel_filename = f"Results/{folder}/Hyperparameter_optimisation_{method}_{version}.xlsx"
 
-        with ExcelWriter(excel_filename) as writer:  # type: ignore[abstract]
+        with ExcelWriter(excel_filename, engine="openpyxl") as writer:  # type: ignore[abstract]
             for collection in self.collections:
                 if collection == "DP" and control:
                     continue
@@ -246,6 +278,11 @@ class SharedPipeline(ABC):
 
                     param = {k: v for k, v in sorted(param.items(), key=lambda item: item[1][0], reverse=True)}
                     data = pd.DataFrame(data=param, index=["Mean", "STD"]).T
+                    if len(index_names) != data.index.nlevels:
+                        raise ValueError(
+                            f"Parameter names for {filename} do not match its results: "
+                            f"expected {data.index.nlevels}, received {len(index_names)}."
+                        )
                     data.index.names = index_names
                     data.to_excel(writer, sheet_name=f"{collection}_{filename}")
                     best_params[collection][filename] = list(param.keys())[0], data
@@ -264,6 +301,8 @@ class SharedPipeline(ABC):
                 for row in current_sheet.iter_rows(min_row=1, max_col=max_col, max_row=max_row, values_only=True)
                 if row[0] is not None
             ]
+            if len(rows) < 2:
+                continue
             max_auc = max(rows[1:], key=lambda x: x[-2])
             index = rows.index(max_auc)
             for cell in current_sheet[index + 1]:
@@ -506,10 +545,10 @@ class SharedPipeline(ABC):
         """
         wb = load_workbook(excel_path)
         sheets = wb.sheetnames
-        red_font = Font(color="00FF0000")
-        green_font = Font(color="00009900", bold=True)
-        blue_font = Font(color="00000099", bold=True)
-        orange_font = Font(color="00FFBF00", bold=True)
+        red_font = Font(color="00FF0000") # Outside of best_auc ± 1 STD
+        green_font = Font(color="00009900", bold=True) # best_AUC
+        blue_font = Font(color="00000099", bold=True) # Best min size model from pairwise t-test
+        orange_font = Font(color="00FFBF00", bold=True) # Best min size model from independent t-test
 
         extras = []
         for sheet in sheets:
@@ -788,58 +827,14 @@ class SharedPipeline(ABC):
             combo_options.kde_method.name.lower(): combo_options.kde_method.value,
         }
 
-        # Use joblib to parellilze for faster processing
         print(f"------------------------{combo_options.collection}------------------------")
-        best_params = Parallel(n_jobs=-1, verbose=50)(
-            delayed(self.train_model_parameters)(parameters, class_model, df, options, rfe)
+        best_params = Parallel(n_jobs=-1, prefer="threads", verbose=50)(
+            delayed(_train_model_parameters)(parameters, class_model, df, options, rfe)
             for parameters in class_model.hyperparameters
         )
         class_model.flush(kde_name)
 
         return best_params
-
-    def train_model_parameters(
-        self,
-        hyperparameters: dict[str, Any],
-        model: ModelEstimator,
-        data: DataFrame,
-        options: dict[str, Any],
-        rfe: bool,
-    ) -> tuple[dict[str, Any], dict[str, Any]]:
-        """Trains model with specific hyperparameters.
-
-        This can be used directly with a loop or parallelized.
-
-        Parameters
-        ----------
-        hyperparameters
-            A dictionary of hyperparameters for the model.
-        model
-            The model instance.
-        data
-            The data to train on.
-        options
-            Additional preprocessing options.
-        rfe
-            If True, then training is altered for recursive feature
-            elimination
-
-        Returns
-        -------
-            Data ordered by hyperparameters with AUC scores.
-        """
-        print(hyperparameters)
-        # Iterate through Monte Carlo split
-        for i, (train_set, validation_set) in enumerate(
-            mc_cv.split(data, y=data.index.get_level_values(level="classification"))
-        ):
-            frames, x_valid, y_valid = model.preprocess(train_set, validation_set, **options)
-            if rfe:
-                model.train_rfe(frames, x_valid, y_valid, i, **hyperparameters)
-            else:
-                model.train(frames, x_valid, y_valid, i, **hyperparameters)
-
-        return hyperparameters, model.train_info
 
     def run_pipeline(
         self, file_path: str, optimise_params: bool = False
@@ -904,7 +899,7 @@ class SharedPipeline(ABC):
             file_contents: Proteins = data.columns.tolist()
         else:
             with open(file_path, "rb") as file:
-                file_contents: Proteins = load(file)  # type: ignore
+                file_contents: Proteins = load(file)[self.collection]  # type: ignore
 
         df = data[file_contents]
 

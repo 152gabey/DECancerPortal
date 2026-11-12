@@ -246,9 +246,10 @@ class Pipeline:
             try:
                 x_df = self.post_t_test(x_df)
             except FileNotFoundError:
-                # Only the fullModel_all files are in
-                # {self.base_path}/post_t_test/
-                return
+                print(
+                    f"Post-t-test features not found for {self.cancer} "
+                    f"({self.combos.classification_mode.value}); using all features."
+                )
 
             search.init_data(sample_ids, x_df, y_data, y_source, y_stage)
             results = search.run_search()

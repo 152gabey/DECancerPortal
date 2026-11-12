@@ -16,6 +16,7 @@ from sklearn.metrics import recall_score
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import roc_curve
 from typing_extensions import Self
+from pathlib import Path
 
 from .constants import ClassifierType
 
@@ -185,7 +186,7 @@ class _FiguresTesting:
         points = self.axes.plot(  # noqa: F841
             fpr,
             tpr,
-            label=f"ROC AUC: {auc_score:.4f}",
+            label=f"{self.cancer} ROC AUC: {auc_score:.4f}",
         )
 
         # J-score
@@ -446,22 +447,32 @@ class _FiguresTesting:
 
         # Now generate results
         for res in test_file:
-            y_pred: np.ndarray = res["results"]["test_results"]["y_pred"]
-            y_truth: np.ndarray = res["results"]["test_results"]["y_truth"]
-            y_cancer_type: np.ndarray = res["results"]["source_test_labels"]
-            y_stage: np.ndarray = res["results"]["stage_test_labels"]
+            result_data = res["results"]
+            result_sets = result_data if isinstance(result_data, list) else [result_data]
 
-            # Create confusion matrix
-            self.create_confusion_matrix(y_pred, y_truth, y_pred.shape[1], self.results_path)  # noqa: W505
+            for result_set in result_sets:
+                test_results = result_set.get("test_results", result_set.get("train_results"))
+                if test_results is None:
+                    raise KeyError("Testing pickle result is missing test_results")
 
-            # Create file of sensitivities at given specificity threshold
-            self.sensitivities_at_specificity(y_pred, y_truth, y_cancer_type, y_stage)
+                y_pred: np.ndarray = test_results["y_pred"]
+                y_truth: np.ndarray = test_results["y_truth"]
+                y_cancer_type: np.ndarray = result_set["source_test_labels"]
+                y_stage: np.ndarray = result_set["stage_test_labels"]
 
-            # Create ROC curve
-            self.y_pred = y_pred
-            self.y_truth = y_truth
-            self.create_roc_curve(y_pred, y_truth)
+                # Create confusion matrix
+                self.create_confusion_matrix(y_pred, y_truth, y_pred.shape[1], self.results_path)  # noqa: W505
 
+                # Create file of sensitivities at given specificity threshold
+                if y_cancer_type.shape[0] == y_pred.shape[0] and y_stage.shape[0] == y_pred.shape[0]:
+                    self.sensitivities_at_specificity(y_pred, y_truth, y_cancer_type, y_stage)
+                else:
+                    print("Skipping sensitivities: test labels do not match prediction length.")
+
+                # Create ROC curve
+                self.y_pred = y_pred
+                self.y_truth = y_truth
+                self.create_roc_curve(y_pred, y_truth)
         return self
 
 
@@ -536,7 +547,7 @@ class _FiguresValidation:
         self.axes.plot(  # noqa: F841
             mean_fpr,
             mean_tpr,
-            label=f"{self.model_name} (AUC={self.auc_score:.4f}, STD={(self.auc_sem * np.sqrt(200)):.4f})",
+            label=f"{self.cancer} {self.model_name} (AUC={self.auc_score:.4f}, STD={(self.auc_sem * np.sqrt(200)):.4f})",
         )
 
         if self.repeat:
@@ -645,7 +656,7 @@ class _FiguresValidation:
         self._create_directories(file_path, model_name)
 
         for res in pkl_file:
-            self.auc_score: float = res["roc_auc"]
+            self.auc_score: float = res["auc"]
             self.auc_sem: float = res["auc_sem"]
 
             # Now we're looking at the average of the ROC curves produced
@@ -653,8 +664,8 @@ class _FiguresValidation:
             self.y_truth_sets = {}
 
             for index, res_set in enumerate(res["results"]):
-                self.y_pred_sets[index] = res_set["valid_results"]["y_pred"]
-                self.y_truth_sets[index] = res_set["valid_results"]["y_truth"]
+                self.y_pred_sets[index] = res_set["train_results"]["y_pred"]
+                self.y_truth_sets[index] = res_set["train_results"]["y_truth"]
 
             scaling = np.exp(np.linspace(-4, 4, 502))
 
@@ -821,10 +832,14 @@ def filter_files(
     file_opts = namedtuple("file_opts", ["cancer_type", "class_type", "model_filter", "model_name"])
 
     def split_file(file_path: str) -> file_opts:
-        if "Test.pkl" in file_path:
-            _, cancer, classification_mode, model_filter, model_name = re.split(r"\\", file_path)
+        path = Path(file_path)
+        parts = path.parts
+
+        if path.name.endswith("Test.pkl"):
+            _, _, cancer, classification_mode, model_filter, model_name = parts
         else:
-            _, cancer, classification_mode, _, model_filter, model_name = re.split(r"\\", file_path)
+            _, _, cancer, classification_mode, _, model_filter, model_name = parts
+
         return file_opts(cancer, classification_mode, model_filter, model_name)
 
     def match_opts(file_path: str, option: str | list[str] | None) -> str | None:

@@ -22,6 +22,11 @@ def hyperparameter_best(cancer: str) -> None:
         The name of the cancer.
     """
     pkl_files = glob.glob(f"{base_path}/{cancer}/*/hyper_optimisation/*Validation.pkl")
+    if not pkl_files:
+        raise FileNotFoundError(
+            f"No hyperparameter results found for {cancer} in "
+            f"{base_path}/{cancer}/*/hyper_optimisation/*Validation.pkl"
+        )
 
     # Create directory where to store results
     res_dir = f"{base_path}/{cancer}/best_hyperparameters"

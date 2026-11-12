@@ -1,3 +1,4 @@
+import inspect
 import os
 import pickle
 import sys
@@ -7,10 +8,38 @@ from typing import Sequence
 
 import numpy as np
 import pandas as pd
+import sklearn.utils
 import sklearn.neighbors._base
+import sklearn.utils.validation
 from src._types import Frames
 from src._types import KDEType
 from src.cancerseek.constants import KDEMethod
+
+if not hasattr(np, "in1d"):
+    np.in1d = np.isin
+
+if "force_all_finite" not in inspect.signature(sklearn.utils.check_array).parameters:
+    _check_array = sklearn.utils.check_array
+
+    def _check_array_compat(*args, force_all_finite=None, **kwargs):
+        if force_all_finite is not None:
+            kwargs["ensure_all_finite"] = force_all_finite
+        return _check_array(*args, **kwargs)
+
+    sklearn.utils.check_array = _check_array_compat
+    sklearn.utils.validation.check_array = _check_array_compat
+
+if not hasattr(sklearn.neighbors._base, "_check_weights"):
+
+    def _check_weights(weights):
+        if weights in (None, "uniform", "distance") or callable(weights):
+            return weights
+        raise ValueError(
+            "weights not recognized: should be 'uniform', "
+            "'distance', or a callable function"
+        )
+
+    sklearn.neighbors._base._check_weights = _check_weights
 
 sys.modules["sklearn.neighbors.base"] = sklearn.neighbors._base  # missingpy is not up to date with newer versions
 from missingpy import MissForest
@@ -206,7 +235,7 @@ class Data:
 
         # Imputing using MissForest
         print("Performing imputation on combined input data with ordinal encoding...")
-        imputer = MissForest()
+        imputer = MissForest(criterion=("squared_error", "gini"), max_features="sqrt")
         x_df_combined_ordinal = imputer.fit_transform(x_df_combined_ordinal)
         x_combined_ordinal = x_df_combined_ordinal
         print("Done.\n")

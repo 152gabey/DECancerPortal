@@ -286,6 +286,11 @@ class RandomForest(Model):
 
         # Scoring
         auc = cast(float, metrics.roc_auc_score(y_test, y_score))
+        self.train_info["auc"] = auc
+        y_truth = np.zeros((y_test.shape[0], 2))
+        y_truth[np.arange(y_test.shape[0]), y_test.astype(int)] = 1
+        self.train_info["y_truth"] = y_truth
+        self.train_info["y_pred"] = estimator.predict_proba(x_test.values)
         return auc
 
     def _train(

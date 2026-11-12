@@ -149,8 +149,8 @@ class Multisurf:
         )
         return train, validation
 
-    def _run_multisurf(self, x_data: DataFrame, y_data: Index) -> MultiSURF:
-        fs = MultiSURF(n_features_to_select=x_data.shape[1], n_jobs=-1)
+    def _run_multisurf(self, x_data: DataFrame, y_data: Index, *, n_jobs: int = -1) -> MultiSURF:
+        fs = MultiSURF(n_features_to_select=x_data.shape[1], n_jobs=n_jobs)
 
         return fs.fit(x_data.values, y_data.values)
 
