@@ -1,0 +1,354 @@
+-- ============================================================
+-- Test queries for decancer_portal
+-- Sections 1-12 only read data. Section 13 inserts test rows inside a
+-- transaction and rolls them back. Section 14 contains statements that SHOULD fail.
+-- The "Expected" comments are the results for the seed data.
+-- ============================================================
+USE decancer_portal;
+
+-- ------------------------------------------------------------
+-- 1. Row counts (run this first)
+-- ------------------------------------------------------------
+SELECT 'Cancer_Types' AS tbl, COUNT(*) AS n FROM Cancer_Types
+UNION ALL SELECT 'Biomarkers', COUNT(*) FROM Biomarkers
+UNION ALL SELECT 'Patients', COUNT(*) FROM Patients
+UNION ALL SELECT 'Users', COUNT(*) FROM Users
+UNION ALL SELECT 'Samples', COUNT(*) FROM Samples
+UNION ALL SELECT 'Diagnosis', COUNT(*) FROM Diagnosis
+UNION ALL SELECT 'Biomarker_Measurements', COUNT(*) FROM Biomarker_Measurements
+UNION ALL SELECT 'Predictions', COUNT(*) FROM Predictions
+UNION ALL SELECT 'Prediction_Scores', COUNT(*) FROM Prediction_Scores
+UNION ALL SELECT 'Prediction_Feedback', COUNT(*) FROM Prediction_Feedback;
+-- Expected (10 rows):
+--   ('Cancer_Types', 9)
+--   ('Biomarkers', 39)
+--   ('Patients', 1803)
+--   ('Users', 4)
+--   ('Samples', 1803)
+--   ('Diagnosis', 1803)
+--   ('Biomarker_Measurements', 70317)
+--   ('Predictions', 0)
+--   ('Prediction_Scores', 0)
+--   ('Prediction_Feedback', 0)
+
+-- ------------------------------------------------------------
+-- 2a. Integrity: every sample has exactly 39 biomarker values (should return no rows)
+-- ------------------------------------------------------------
+SELECT s.Sample_Code, COUNT(m.Biomarker_ID) AS n_values
+FROM Samples s
+LEFT JOIN Biomarker_Measurements m ON m.Sample_ID = s.Sample_ID
+GROUP BY s.Sample_ID, s.Sample_Code
+HAVING COUNT(m.Biomarker_ID) <> 39;
+-- Expected: no rows
+
+-- ------------------------------------------------------------
+-- 2b. Integrity: every patient has a sample (should return no rows)
+-- ------------------------------------------------------------
+SELECT p.Patient_ID, p.FirstName, p.LastName
+FROM Patients p
+LEFT JOIN Samples s ON s.Patient_ID = p.Patient_ID
+WHERE s.Sample_ID IS NULL;
+-- Expected: no rows
+
+-- ------------------------------------------------------------
+-- 2c. Integrity: cancer-free patients have no stage or treatment (should be 0)
+-- ------------------------------------------------------------
+SELECT COUNT(*) AS cancer_free_with_stage_or_treatment
+FROM Diagnosis d
+JOIN Cancer_Types ct ON ct.Cancer_ID = d.Cancer_ID
+WHERE ct.is_cancer_free = 1
+  AND (d.Cancer_Stage IS NOT NULL OR d.Treatment IS NOT NULL);
+-- Expected (1 row):
+--   (0)
+
+-- ------------------------------------------------------------
+-- 2d. Integrity: cancer patients all have stage and treatment (should be 0)
+-- ------------------------------------------------------------
+SELECT COUNT(*) AS cancer_patients_missing_stage_or_treatment
+FROM Diagnosis d
+JOIN Cancer_Types ct ON ct.Cancer_ID = d.Cancer_ID
+WHERE ct.is_cancer_free = 0
+  AND (d.Cancer_Stage IS NULL OR d.Treatment IS NULL);
+-- Expected (1 row):
+--   (0)
+
+-- ------------------------------------------------------------
+-- 2e. Integrity: age from date of birth equals stored age (MySQL only, should be 0)
+-- ------------------------------------------------------------
+SELECT COUNT(*) AS age_mismatches
+FROM Samples s
+JOIN Patients p ON p.Patient_ID = s.Patient_ID
+WHERE TIMESTAMPDIFF(YEAR, p.Date_of_Birth, s.Collection_Date) <> s.Age_At_Collection;
+-- Expected: age_mismatches = 0
+
+-- ------------------------------------------------------------
+-- 3. Patients per cancer type
+-- ------------------------------------------------------------
+SELECT ct.Cancer_Name, COUNT(*) AS n_patients
+FROM Diagnosis d
+JOIN Cancer_Types ct ON ct.Cancer_ID = d.Cancer_ID
+GROUP BY ct.Cancer_ID, ct.Cancer_Name
+ORDER BY n_patients DESC, ct.Cancer_Name;
+-- Expected (9 rows):
+--   ('Normal (cancer-free)', 799)
+--   ('Colorectum', 388)
+--   ('Breast', 208)
+--   ('Lung', 104)
+--   ('Pancreas', 93)
+--   ('Stomach', 68)
+--   ('Ovary', 54)
+--   ('Esophagus', 45)
+--   ('Liver', 44)
+
+-- ------------------------------------------------------------
+-- 4. Race and sex categories (must match what the model was trained on)
+-- ------------------------------------------------------------
+SELECT Race, Sex, COUNT(*) AS n
+FROM Patients
+GROUP BY Race, Sex
+ORDER BY Race, Sex;
+-- Expected: 16 rows, first 3:
+--   ('Asian', 'Female', 159)
+--   ('Asian', 'Male', 163)
+--   ('Black', 'Female', 62)
+
+-- ------------------------------------------------------------
+-- 5. Biomarkers in model order (generated Model_Feature_Name column)
+-- ------------------------------------------------------------
+SELECT Biomarker_ID, Model_Feature_Name
+FROM Biomarkers
+ORDER BY Biomarker_ID;
+-- Expected: 39 rows, first 3:
+--   (1, 'AFP (pg/ml)')
+--   (2, 'Angiopoietin-2 (pg/ml)')
+--   (3, 'AXL (pg/ml)')
+
+-- ------------------------------------------------------------
+-- 6. Model input: the 39 protein values of one sample, in model order
+-- ------------------------------------------------------------
+SELECT b.Model_Feature_Name, m.Value
+FROM Biomarker_Measurements m
+JOIN Samples s ON s.Sample_ID = m.Sample_ID
+JOIN Biomarkers b ON b.Biomarker_ID = m.Biomarker_ID
+WHERE s.Sample_Code = 'CRC 456 PLS 1'
+ORDER BY b.Biomarker_ID;
+-- Expected: 39 rows, first 3:
+--   ('AFP (pg/ml)', 715.308)
+--   ('Angiopoietin-2 (pg/ml)', 20936.35)
+--   ('AXL (pg/ml)', 2772.96)
+
+-- ------------------------------------------------------------
+-- 7. Model input: Race, Sex, Omega score and Age of the same sample
+-- ------------------------------------------------------------
+SELECT p.Race, p.Sex, s.Omega_Score AS omega_score, s.Age_At_Collection AS age
+FROM Samples s
+JOIN Patients p ON p.Patient_ID = s.Patient_ID
+WHERE s.Sample_Code = 'CRC 456 PLS 1';
+-- Expected (1 row):
+--   ('Caucasian', 'Female', 2.45, 59)
+
+-- ------------------------------------------------------------
+-- 8. Patient detail page (oncologist view)
+-- ------------------------------------------------------------
+SELECT p.Patient_ID, p.FirstName, p.LastName, p.Date_of_Birth, p.Sex, p.Race, p.Country,
+       ct.Cancer_Name, d.Cancer_Stage, d.Histopathology, d.Treatment, s.Sample_Code
+FROM Patients p
+JOIN Diagnosis d ON d.Patient_ID = p.Patient_ID
+JOIN Cancer_Types ct ON ct.Cancer_ID = d.Cancer_ID
+JOIN Samples s ON s.Sample_ID = d.Sample_ID
+WHERE p.Patient_ID = 1;
+-- Expected (1 row):
+--   (1, 'James', 'Hierro', '1955-08-05', 'Male', 'Caucasian', 'Ireland', 'Colorectum', 'I', 'Adenocarcinoma', 'Surgical resection', 'CRC 455 PLS 1')
+
+-- ------------------------------------------------------------
+-- 9a. Filter by gene: patients with a KRAS mutation (first 10 shown)
+-- ------------------------------------------------------------
+SELECT p.Patient_ID, p.FirstName, p.LastName, s.Mutation_Gene, s.Mutation_Detail, s.Chromosome
+FROM Samples s
+JOIN Patients p ON p.Patient_ID = s.Patient_ID
+WHERE s.Mutation_Gene = 'KRAS'
+ORDER BY p.Patient_ID
+LIMIT 10;
+-- Expected: 115 matching rows in total (first 10 shown)
+
+-- ------------------------------------------------------------
+-- 9b. Patients with the same mutation (TP53 p.R248Q)
+-- ------------------------------------------------------------
+SELECT p.Patient_ID, p.FirstName, p.LastName, s.Mutation_Detail
+FROM Samples s
+JOIN Patients p ON p.Patient_ID = s.Patient_ID
+WHERE s.Mutation_Gene = 'TP53' AND s.Mutation_Detail LIKE 'p.R248Q%'
+ORDER BY p.Patient_ID
+LIMIT 10;
+-- Expected: 15 matching rows in total (first 10 shown)
+
+-- ------------------------------------------------------------
+-- 9c. Filter by chromosome (chromosome 17)
+-- ------------------------------------------------------------
+SELECT COUNT(*) AS samples_on_chr17
+FROM Samples
+WHERE Chromosome = '17';
+-- Expected (1 row):
+--   (1315)
+
+-- ------------------------------------------------------------
+-- 9d. Filter by position (only splice-site rows have a position)
+-- ------------------------------------------------------------
+SELECT COUNT(*) AS samples_with_position
+FROM Samples
+WHERE Position IS NOT NULL;
+-- Expected (1 row):
+--   (40)
+
+-- ------------------------------------------------------------
+-- 10a. Researcher view: number of mutations per gene
+-- ------------------------------------------------------------
+SELECT Mutation_Gene, COUNT(*) AS n_mutations
+FROM Samples
+WHERE Mutation_Gene IS NOT NULL
+GROUP BY Mutation_Gene
+ORDER BY n_mutations DESC, Mutation_Gene;
+-- Expected: 16 rows, first 3:
+--   ('TP53', 1315)
+--   ('KRAS', 115)
+--   ('FBXW7', 45)
+
+-- ------------------------------------------------------------
+-- 10b. Researcher view: mutations in selected genes, split by cancer type
+-- ------------------------------------------------------------
+SELECT s.Mutation_Gene, ct.Cancer_Name, COUNT(*) AS n
+FROM Samples s
+JOIN Diagnosis d ON d.Sample_ID = s.Sample_ID
+JOIN Cancer_Types ct ON ct.Cancer_ID = d.Cancer_ID
+WHERE s.Mutation_Gene IN ('TP53', 'KRAS', 'PIK3CA')
+GROUP BY s.Mutation_Gene, ct.Cancer_ID, ct.Cancer_Name
+ORDER BY s.Mutation_Gene, ct.Cancer_Name;
+-- Expected: 25 rows
+
+-- ------------------------------------------------------------
+-- 10c. Mutation types
+-- ------------------------------------------------------------
+SELECT Mutation_Type, COUNT(*) AS n
+FROM Samples
+WHERE Mutation_Type IS NOT NULL
+GROUP BY Mutation_Type
+ORDER BY n DESC, Mutation_Type;
+-- Expected (6 rows):
+--   ('Missense', 1410)
+--   ('Frameshift', 189)
+--   ('Nonsense', 81)
+--   ('Splice site', 40)
+--   ('Splice region (exon end)', 15)
+--   ('Synonymous', 3)
+
+-- ------------------------------------------------------------
+-- 11a. Login lookup: users and roles (the password hash must start with $2y$)
+-- ------------------------------------------------------------
+SELECT User_ID, Username, Role, Speciality, Patient_ID, LEFT(Password_Hash, 4) AS hash_prefix
+FROM Users
+ORDER BY User_ID;
+-- Expected (4 rows):
+--   (1, 'admin', 'admin', NULL, NULL, '$2y$')
+--   (2, 'researcher1', 'researcher', 'Cancer genomics', NULL, '$2y$')
+--   (3, 'oncologist1', 'oncologist', 'Medical oncology', NULL, '$2y$')
+--   (4, 'patient1', 'patient', NULL, 1, '$2y$')
+
+-- ------------------------------------------------------------
+-- 11b. The patient login is linked to a patient record with the same name
+-- ------------------------------------------------------------
+SELECT u.Username, u.FirstName, u.LastName, p.Patient_ID, p.FirstName AS patient_first, p.LastName AS patient_last
+FROM Users u
+JOIN Patients p ON p.Patient_ID = u.Patient_ID;
+-- Expected (1 row):
+--   ('patient1', 'James', 'Hierro', 1, 'James', 'Hierro')
+
+-- ------------------------------------------------------------
+-- 12. Generated column: CA-125 must read 'CA-125 (U/ml)'
+-- ------------------------------------------------------------
+SELECT Biomarker_ID, Name, Unit, Model_Feature_Name
+FROM Biomarkers
+WHERE Name = 'CA-125';
+-- Expected (1 row):
+--   (4, 'CA-125', 'U/ml', 'CA-125 (U/ml)')
+
+-- ------------------------------------------------------------
+-- 13. Prediction tables: save a prediction, add feedback, then undo everything
+--     (MySQL only; the ROLLBACK at the end removes the test rows)
+-- ------------------------------------------------------------
+START TRANSACTION;
+
+-- researcher1 (User 2) runs the model on sample 1
+INSERT INTO Predictions (Sample_ID, User_ID, Pancancer_Probability, Prediction_Result, Model_Version)
+VALUES (1, 2, 0.93, 'cancer', 'DeCancer v1.0');
+SET @pid = LAST_INSERT_ID();
+
+-- one score per cancer type (Cancer_ID 2-9 = Breast ... Stomach)
+INSERT INTO Prediction_Scores (Prediction_ID, Cancer_ID, Probability) VALUES
+  (@pid, 2, 0.02), (@pid, 3, 0.81), (@pid, 4, 0.01), (@pid, 5, 0.01),
+  (@pid, 6, 0.05), (@pid, 7, 0.02), (@pid, 8, 0.07), (@pid, 9, 0.01);
+
+-- oncologist1 (User 3) says the prediction was correct
+INSERT INTO Prediction_Feedback (Prediction_ID, User_ID, Feedback_Type, Feedback_Comment)
+VALUES (@pid, 3, 'correct', 'Matches the diagnosis');
+
+-- Top predicted cancer type for this prediction
+SELECT ct.Cancer_Name, ps.Probability
+FROM Prediction_Scores ps
+JOIN Cancer_Types ct ON ct.Cancer_ID = ps.Cancer_ID
+WHERE ps.Prediction_ID = @pid
+ORDER BY ps.Probability DESC
+LIMIT 1;
+-- Expected: ('Colorectum', 0.81)
+
+-- Prediction compared with the real diagnosis
+SELECT pr.Pancancer_Probability, pr.Prediction_Result, ct.Cancer_Name AS real_diagnosis, f.Feedback_Type
+FROM Predictions pr
+JOIN Diagnosis d ON d.Sample_ID = pr.Sample_ID
+JOIN Cancer_Types ct ON ct.Cancer_ID = d.Cancer_ID
+LEFT JOIN Prediction_Feedback f ON f.Prediction_ID = pr.Prediction_ID
+WHERE pr.Prediction_ID = @pid;
+-- Expected: (0.93, 'cancer', 'Colorectum', 'correct')
+
+-- Deleting the prediction must also delete its scores and feedback (ON DELETE CASCADE)
+DELETE FROM Predictions WHERE Prediction_ID = @pid;
+SELECT (SELECT COUNT(*) FROM Prediction_Scores WHERE Prediction_ID = @pid) AS scores_left,
+       (SELECT COUNT(*) FROM Prediction_Feedback WHERE Prediction_ID = @pid) AS feedback_left;
+-- Expected: scores_left = 0, feedback_left = 0
+
+ROLLBACK;
+
+-- ------------------------------------------------------------
+-- 14. Constraint tests: every statement below SHOULD FAIL (run them one at a time).
+--     If one succeeds, the constraint is missing. Nothing is saved when they fail.
+-- ------------------------------------------------------------
+
+-- a) Duplicate sample code -> ERROR 1062 (Duplicate entry)
+INSERT INTO Samples (Sample_Code, Patient_ID, Uploaded_By, Age_At_Collection, Omega_Score)
+VALUES ('CRC 455 PLS 1', 1, 2, 60, 1.0);
+
+-- b) Sample for a patient that does not exist -> ERROR 1452 (foreign key)
+INSERT INTO Samples (Sample_Code, Patient_ID, Uploaded_By, Age_At_Collection, Omega_Score)
+VALUES ('TEST-001', 999999, 2, 50, 1.0);
+
+-- c) Probability above 1 -> ERROR 3819 (check constraint chk_pred_prob)
+INSERT INTO Predictions (Sample_ID, User_ID, Pancancer_Probability, Prediction_Result, Model_Version)
+VALUES (1, 2, 1.5, 'cancer', 'test');
+
+-- d) Age outside 0-120 -> ERROR 3819 (check constraint chk_samples_age)
+INSERT INTO Samples (Sample_Code, Patient_ID, Uploaded_By, Age_At_Collection, Omega_Score)
+VALUES ('TEST-002', 1, 2, 200, 1.0);
+
+-- e) Allele frequency above 100 -> ERROR 3819 (check constraint chk_samples_maf)
+INSERT INTO Samples (Sample_Code, Patient_ID, Uploaded_By, Age_At_Collection, Omega_Score, Mutant_Allele_Frequency)
+VALUES ('TEST-003', 1, 2, 50, 1.0, 150);
+
+-- f) Invalid sex value -> ERROR 1265 (Data truncated; needs the default strict SQL mode)
+INSERT INTO Patients (FirstName, LastName, Date_of_Birth, Sex, Race)
+VALUES ('Test', 'Person', '1980-01-01', 'Other', 'Unknown');
+
+-- g) Delete a patient who still has samples -> ERROR 1451 (ON DELETE RESTRICT)
+DELETE FROM Patients WHERE Patient_ID = 1;
+
+-- h) Duplicate username -> ERROR 1062
+INSERT INTO Users (Username, Email, Password_Hash, FirstName, LastName, Role)
+VALUES ('admin', 'other@decancer.demo', 'x', 'Test', 'User', 'admin');
