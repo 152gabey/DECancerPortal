@@ -37,8 +37,8 @@ CACHE_PATH = "pipeline_cache"
 REFRESH_CACHE = False
 PIPELINE_FLAG = PipelineMode.TESTING
 RESULTS_PATH = f"Results/{PIPELINE_FLAG.value}"
-VALIDATION_FLAG = ValidationMode.NO_RFE
-BEST_PARAMS_USED = False
+VALIDATION_FLAG = ValidationMode.RECURSIVE_FEATURE_ELIMINATION
+BEST_PARAMS_USED = True
 
 cancer_types = [
     CancerType.BREAST,

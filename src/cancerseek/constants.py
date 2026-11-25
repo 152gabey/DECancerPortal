@@ -42,22 +42,6 @@ rf_params = (
     ("random_state", [42]),
 )
 
-# TODO
-rfe_proteins = [
-    'P22891', 
-    'Q9BXJ4', 
-    'P05109', 
-    'P55290', 
-    'P05062', 
-    'Q6UXB8', 
-    'P06702', 
-    'Q9NQ79', 
-    'P00738', 
-    'Q9UBQ6', 
-    'P02741', 
-    'P13591'
-]
-
 class ClassifierType(Enum):
     """The type of classifier."""
 

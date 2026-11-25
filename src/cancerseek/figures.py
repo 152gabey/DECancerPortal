@@ -15,8 +15,11 @@ from pandas import Series
 from sklearn.metrics import recall_score
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import roc_curve
+import seaborn as sns
 from typing_extensions import Self
 from pathlib import Path
+
+from src.cancerseek.utility import DataFeatures
 
 from .constants import ClassifierType
 
@@ -233,6 +236,75 @@ class _FiguresTesting:
         )
 
         plt.cla()
+
+    def _normalise(self, df, how):
+        if how == "row":  # each model sums to 1 -> comparable across models
+            return df.div(df.sum(axis=1), axis=0), "Relative importance"
+        if how == "rank":  # 1 = most important within that model
+            return df.rank(axis=1, ascending=False, method="min"), "Rank (1 = most important)"
+        return df, "Importance"  # raw
+
+    def create_feature_importance_heatmap(
+            self,
+            data: dict,
+            normalise: str | None = "row",
+            no_cluster: bool = True,
+            annotate: bool = True,
+            keep_units: bool = False,
+            cmap: str = "viridis",
+            dpi: int = 300
+    ):
+        features = list(DataFeatures.features) + list(DataFeatures.categorical_features)
+        df = pd.DataFrame.from_dict(data, orient="index", columns=features)
+        
+        df_plot, cbar_label = self._normalise(df, normalise)
+        if not keep_units:
+            df_plot.columns = [re.sub(r"\s*\((?:pg/ml|ng/ml|U/ml|nM)\)\s*$", "", c) for c in df_plot.columns]
+
+        df_plot.index = [i.capitalize() if i.islower() else i for i in df_plot.index]
+    
+        # Rank heatmaps read better with the colour scale reversed (1 = bright)
+        cmap = cmap + "_r" if normalise == "rank" else cmap
+    
+        n_rows, n_cols = df_plot.shape
+        figsize = (max(10, 0.38 * n_cols + 3), max(4.5, 0.5 * n_rows + 3))
+    
+        common = dict(
+            cmap=cmap,
+            linewidths=0.4,
+            linecolor="white",
+            annot=annotate,
+            fmt=".2f" if normalise != "rank" else ".0f",
+            annot_kws={"size": 6},
+            cbar_kws={"label": cbar_label},
+        )
+    
+        if no_cluster:
+            fig, ax = plt.subplots(figsize=figsize)
+            sns.heatmap(df_plot, ax=ax, **common)
+            ax.set_xlabel("Feature")
+            ax.set_ylabel("Cancer type")
+            plt.setp(ax.get_xticklabels(), rotation=90)
+            plt.setp(ax.get_yticklabels(), rotation=0)
+            fig.tight_layout()
+        else:
+            # Hierarchical clustering groups similar cancers and co-important features
+            g = sns.clustermap(
+                df_plot,
+                figsize=figsize,
+                method="average",
+                metric="euclidean",
+                dendrogram_ratio=(0.12, 0.15),
+                cbar_pos=(0.02, 0.8, 0.02, 0.15),
+                **common,
+            )
+            g.ax_heatmap.set_xlabel("Feature")
+            g.ax_heatmap.set_ylabel("Cancer type")
+            plt.setp(g.ax_heatmap.get_xticklabels(), rotation=90)
+            plt.setp(g.ax_heatmap.get_yticklabels(), rotation=0)
+            fig = g.fig
+    
+        fig.savefig(self.results_path + "/feature_importances.jpeg", dpi=dpi, bbox_inches="tight")
 
     def create_confusion_matrix(
         self,

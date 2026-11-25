@@ -4,7 +4,7 @@
 #     https://www.atlassian.com/git/tutorials/saving-changes/gitignore
 
 # Custom
-Results/
+Results/validation/
 venv/
 KEGG/
 pipeline_cache/
