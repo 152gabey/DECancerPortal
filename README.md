@@ -31,17 +31,19 @@ portal service while providing a place to add API routes and client features.
    deployment.
 
 2. Initialise the DECancer database:
-   ```sh
-   mysql -u root -p < database/init.sql
-   ```
 
-2. Start MySQL:
+   a. Navigate to the database directory: `cd database`    
+   b. Run the database initialization script: `mysql -u root -p < 00_init_database_v1.sql`   
+   c. Import the initial data: `mysql -u root -p < 01_data_import_v1.sql`    
+   d. Run test queries from the `02_test_data_v1.sql` file to test the database connection.
+
+3. Start MySQL:
 
    ```sh
    mysql -h 127.0.0.1 -u root -p --protocol=TCP
    ```
 
-3. Create a portal virtual environment and install the API dependencies:
+4. Create a portal virtual environment and install the API dependencies:
 
    ```sh
    python -m venv .venv
@@ -53,7 +55,7 @@ portal service while providing a place to add API routes and client features.
    The dependency pins support Python 3.15.2. Use a fresh virtual environment
    so older NumPy and SciPy installations are not reused.
 
-4. Start the FastAPI development server:
+5. Start the FastAPI development server:
 
    ```sh
    uvicorn backend.app.main:app --reload
@@ -63,15 +65,17 @@ portal service while providing a place to add API routes and client features.
    `http://127.0.0.1:8000/api/health` for liveness and
    `http://127.0.0.1:8000/api/health/database` for MySQL connectivity.
 
-5. Serve `frontend/` with any static web server during development, for
+6. Serve `frontend/` with any static web server during development, for
    example `python -m http.server 8080 --directory frontend`. Configure that
    server to proxy `/api` to the FastAPI service, or open the client from the
    same origin when the API serves the frontend.
 
 ## Nanoparticles
+
 Processed data is provided in `perseus_imputation/` for each of the 5 SPIONS and diluted plasma (DP). Note here that hyperparameters need to be specified for each algorithm which can be added to `src/parameters.py` when performing hyperparameter optimisation. Also not included is the steps taken for feature selection. Implementation fits between running the pipeline initially and before hyperparameter tuning found in `main.py`.
 
 Hyperparameters are in the form of a tuple:
+
 ```py
 params = (("name", (value1, value2, value3)),)
 ```
@@ -79,7 +83,9 @@ params = (("name", (value1, value2, value3)),)
 Run the pipeline with `python main.py`
 
 ## CancerSEEK
+
 Data is found in `cancerseek_data/`. Hyperparameters must be specified in the form of a tuple:
+
 ```py
 params = (("name", (value1, value2, value3)),)
 ```
