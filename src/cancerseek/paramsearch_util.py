@@ -199,10 +199,9 @@ class ParameterSearch:
                 )
 
                 model.clf.set_params(**param_set)
-                model.train_testing(train_frame, pd.DataFrame(data.x_test), pd.Series(data.y_test))
+                roc_auc = model.train_testing(train_frame, pd.DataFrame(data.x_test), pd.Series(data.y_test))
 
                 feature_importances = model.train_info.get("feature_importances")
-                roc_auc = model.train_info.get("auc")
 
                 info = {
                     "train_ids": data.ids_train,

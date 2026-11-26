@@ -11,6 +11,7 @@ from sklearn.ensemble import RandomForestClassifier
 from src.constants import AugmentationMethod
 from src.constants import PipelineStage
 from src.data_models import ConstantOptions
+from src.feature_selection import Multisurf
 from src.parameters import Parameter
 from src.parameters import rf_params
 from src.pipeline import combo_pipelines
@@ -51,7 +52,24 @@ if __name__ == "__main__":
         os.makedirs(file_start, exist_ok=True)
 
         pipe.data = cast(list[dict[str, Any]], pipe.run_pipeline(file_path))
-        # Data is used to select features for rest of pipeline
+
+        # Freeze the feature-selection result before tuning without feature
+        # selection. The tuning stage expects a collection-to-proteins mapping.
+        training_data = pipe.combo_options.data.training
+        features = Multisurf()._run_multisurf(
+            training_data,
+            training_data.index.get_level_values(level="classification"),
+            n_jobs=1,
+        )
+        selected_indices = [
+            index for index in features.top_features_ if features.feature_importances_[index] > 0
+        ]
+        if not selected_indices:
+            selected_indices = list(features.top_features_)
+        selected_indices = selected_indices[:80]
+        selected_proteins = training_data.columns[selected_indices].tolist()
+        with open(file_path, "wb") as file:
+            dump({pipe.collection: selected_proteins}, file)
 
         pipe.combo_options.preprocessor = "no_preprocessing"
         pipe.hyperparameters = [Parameter(RandomForestClassifier, *el) for el in rf_params]
@@ -67,7 +85,7 @@ if __name__ == "__main__":
         params = [Parameter(model, name, [value]) for name, value in zip(param_names, param_values)]
 
         with open(file_path, "rb") as handle:
-            proteins = load(handle)
+            proteins = load(handle)[pipe.collection]
 
         # Recursive Feature Elimination
         rfe_data = pipe._run_rfe_loop(pipe.collection, pipe.kde_method, params, proteins=proteins)

@@ -3,7 +3,7 @@ from typing import cast
 
 import matplotlib.pyplot as plt
 import numpy as np
-from src.cancerseek.constants import FigureFlag
+from src.cancerseek.constants import CancerType, FigureFlag
 from src.cancerseek.figures import _FiguresValidation
 from src.cancerseek.figures import filter_files
 from src.cancerseek.figures import sort_files
@@ -13,6 +13,17 @@ from src.pipeline import combo_pipelines
 
 NANOPARTICLES = False
 np.random.seed(0)
+cancer_types = [
+    CancerType.BREAST,
+    CancerType.COLORECTUM,
+    CancerType.ESOPHAGUS,
+    CancerType.LIVER,
+    CancerType.LUNG,
+    CancerType.OVARY,
+    CancerType.PANCREAS,
+    CancerType.STOMACH,
+    CancerType.PANCANCER,
+]
 
 if NANOPARTICLES:
     from src.figures import Figures
@@ -41,12 +52,12 @@ if NANOPARTICLES:
 else:
     from src.cancerseek.figures import Figures
 
-    figure_flag = FigureFlag.VALIDATION
+    figure_flag = FigureFlag.TEST
 
     pkl_files = (
         filter_files(
             glob.glob("Results/test/*/*/*/*Test*.pkl"),
-            "Breast",
+            [cancer_type.value for cancer_type in cancer_types],
             class_type="cancer-healthy",
             model_filter=["fullModel_all"],
         )
@@ -54,7 +65,7 @@ else:
         else sort_files(
             filter_files(
                 glob.glob("Results/validation/*/*/0/*/*Validation*.pkl"),
-                "Breast",
+                [cancer_type.value for cancer_type in cancer_types],
                 class_type=["cancer-healthy"],
                 model_filter=["fullModel_all", "proteinsOnly_postTTest"],
             )
@@ -69,7 +80,6 @@ else:
         # Creates an instance of a Figure class for each file
         figures = Figures(fig, ax)
         pkl_file = pkl_file.replace("\\", "/")
-        print(pkl_file)
 
         if figure_flag == FigureFlag.VALIDATION:
             model_name = pkl_file.split("/")[-1].split(".")[0].split("Validation")[0]
@@ -92,7 +102,7 @@ else:
                 self.last_label = ""
 
         shared = Shared()
-
+        print(groups)
         # Create groups of 4 so all models get added onto same figure
         groups = [list(split) for split in np.array_split(groups, int(len(groups) / 4))]
         for group, ax, letter in zip(groups, axes, letters):
