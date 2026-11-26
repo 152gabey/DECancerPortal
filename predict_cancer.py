@@ -203,7 +203,7 @@ def save_test_data(user_id: int, verbose: bool = False) -> int:
                     # Reshape features from 1D array to 2D array for model prediction
                     # predict() expects shape (n_samples, n_features) where n_samples=1
                     features_2d = [[f for f in features]]
-                    prediction = model.predict(features_2d)
+                    probabilities = model.predict_proba(features_2d)
                     
                     # Extract feature importances from the pipeline's classifier step
                     classifier = model.named_steps['classifier']
@@ -211,8 +211,8 @@ def save_test_data(user_id: int, verbose: bool = False) -> int:
 
                     output[sample_id].append({
                         "cancer_id": CANCER_TYPE_TO_ID[cancer_type],
-                        "probability": float(max(prediction)),
-                        "prediction_result": "cancer" if prediction.argmax() == 0 else "cancer-free",
+                        "probability": float(probabilities[0][1]),
+                        "prediction_result": "cancer" if probabilities[0][1] > probabilities[0][0] else "cancer-free",
                         "highest_protein_influence": float(max(feature_importance[:39])),
                         "highest_biomarker_id": int(feature_importance[:39].argmax()),
                     })
