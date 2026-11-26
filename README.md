@@ -16,7 +16,9 @@ frontend/
   styles.css
   app.js
 database/
-  init.sql          # starter MySQL schema
+  00_init_database_v1.sql          # starter MySQL schema
+  01_data_import_v1.sql            # mockup data for tables
+  02_test_data_v1.sql              # queries
 docker-compose.yml # local MySQL service
 ```
 
@@ -27,46 +29,101 @@ portal service while providing a place to add API routes and client features.
 
 ## Portal stack quick start
 
-1. Copy `.env.example` to `.env` and change credentials for a non-local
-   deployment.
+### 1. Environment configuration
 
-2. Initialise the DECancer database:
-   ```sh
-   mysql -u root -p < database/init.sql
-   ```
+Copy `.env.example` to `.env` and update credentials for your deployment:
 
-2. Start MySQL:
+```sh
+cp .env.example .env
+```
 
-   ```sh
-   mysql -h 127.0.0.1 -u root -p --protocol=TCP
-   ```
+For local development, the defaults should work. For non-local deployments,
+update database host, port, username, and password.
 
-3. Create a portal virtual environment and install the API dependencies:
+### 2. Database setup using SQLTools (Recommended)
 
-   ```sh
-   python -m venv .venv
-   . .venv/bin/activate
-   pip install --upgrade pip
-   pip install -r requirements.txt
-   ```
+This project uses SQLTools for database management within VS Code. Follow these
+steps to activate and run the database:
 
-   The dependency pins support Python 3.15.2. Use a fresh virtual environment
-   so older NumPy and SciPy installations are not reused.
+#### Install SQLTools extension
 
-4. Start the FastAPI development server:
+1. Open VS Code and navigate to Extensions (`Ctrl+Shift+X` / `Cmd+Shift+X`)
+2. Search for "SQLTools" by Matheus Teixeira
+3. Click **Install**
+4. Also install the **SQLTools MySQL/MariaDB** driver extension
 
-   ```sh
-   uvicorn backend.app.main:app --reload
-   ```
+#### Add database connection
 
-   The API is available at `http://127.0.0.1:8000`. Check
-   `http://127.0.0.1:8000/api/health` for liveness and
-   `http://127.0.0.1:8000/api/health/database` for MySQL connectivity.
+1. Open the SQLTools explorer panel (database icon in the left sidebar)
+2. Click **Add Connection** or the `+` icon
+3. Select **MySQL** as the database type
+4. Configure the connection:
+   - **Connection name:** `DECancer Local` (or your preferred name)
+   - **Host:** `127.0.0.1` (for local MySQL)
+   - **Port:** `3306` (default MySQL port)
+   - **Database:** Leave empty initially
+   - **Username:** `root` (or your MySQL user)
+   - **Password:** Your MySQL password
+5. Click **Save Connection**
 
-5. Serve `frontend/` with any static web server during development, for
-   example `python -m http.server 8080 --directory frontend`. Configure that
-   server to proxy `/api` to the FastAPI service, or open the client from the
-   same origin when the API serves the frontend.
+#### Initialize the database
+
+1. In the SQLTools explorer, expand the connection you just created
+2. Right-click the connection name and select **New Query**
+3. Open the first initialization file: [database/00_init_database_v1.sql](/Users/gabeysinghe/Desktop/BIOM9450/DECancerPortal/database/00_init_database_v1.sql)
+4. Select all content (`Ctrl+A` / `Cmd+A`) and execute the query:
+   - Click the **Execute** button (play icon) or press `Ctrl+Shift+Enter` / `Cmd+Shift+Enter`
+   - This creates the `decancer_portal` database and schema
+5. Repeat for [database/01_data_import_v1.sql](/Users/gabeysinghe/Desktop/BIOM9450/DECancerPortal/database/01_data_import_v1.sql) to populate test data
+6. Optionally run [database/02_test_data_v1.sql](/Users/gabeysinghe/Desktop/BIOM9450/DECancerPortal/database/02_test_data_v1.sql) for additional queries
+
+#### Verify the database connection
+
+1. In SQLTools explorer, expand your connection
+2. You should see the `decancer_portal` database listed
+3. Expand it to view tables: `Patients`, `Cancer_Types`, `Users`, `Results`, etc.
+
+### Alternative: Command-line database setup
+
+If you prefer the command line, initialize the database directly:
+
+```sh
+mysql -h 127.0.0.1 -u root -p < database/00_init_database_v1.sql
+mysql -h 127.0.0.1 -u root -p decancer_portal < database/01_data_import_v1.sql
+mysql -h 127.0.0.1 -u root -p decancer_portal < database/02_test_data_v1.sql
+```
+
+### 3. Create a Python virtual environment
+
+```sh
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+The dependency pins support Python 3.15.2. Use a fresh virtual environment
+so older NumPy and SciPy installations are not reused.
+
+### 4. Start the FastAPI development server
+
+```sh
+uvicorn backend.app.main:app --reload
+```
+
+The API is available at `http://127.0.0.1:8000`. Check:
+- `http://127.0.0.1:8000/api/health` for liveness
+- `http://127.0.0.1:8000/api/health/database` for MySQL connectivity
+
+### 5. Serve the frontend
+
+```sh
+python -m http.server 8080 --directory frontend
+```
+
+Open `http://127.0.0.1:8080` in your browser. Configure your server to proxy
+`/api` requests to the FastAPI service at `http://127.0.0.1:8000`, or access
+both from the same origin.
 
 ## Nanoparticles
 Processed data is provided in `perseus_imputation/` for each of the 5 SPIONS and diluted plasma (DP). Note here that hyperparameters need to be specified for each algorithm which can be added to `src/parameters.py` when performing hyperparameter optimisation. Also not included is the steps taken for feature selection. Implementation fits between running the pipeline initially and before hyperparameter tuning found in `main.py`.
