@@ -27,21 +27,3 @@ class Parameter:
         if self.name not in all_params:
             raise ValueError(f'"{self.name}" is not a valid parameter of the {self.model().__class__.__name__}.')
 
-
-# Multilayer Perceptron hyperparameters
-mlp_params = ((), (), ...)
-
-# Logistic Regression (L2 penalised) hyperparameters
-lr2_params = ((), (), ...)
-
-# Support Vector Machine hyperparameters
-svm_params = ((), (), ...)
-
-# Random Forest hyperparameters
-rf_params = ((), (), ...)
-
-# Decision Tree hyperparameters
-dt_params = ((), (), ...)
-
-# XGBoost Classifier hyperparameters
-xgb_params = ((), (), ...)

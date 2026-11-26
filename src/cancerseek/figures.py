@@ -15,7 +15,11 @@ from pandas import Series
 from sklearn.metrics import recall_score
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import roc_curve
+import seaborn as sns
 from typing_extensions import Self
+from pathlib import Path
+
+from src.cancerseek.utility import DataFeatures
 
 from .constants import ClassifierType
 
@@ -185,7 +189,7 @@ class _FiguresTesting:
         points = self.axes.plot(  # noqa: F841
             fpr,
             tpr,
-            label=f"ROC AUC: {auc_score:.4f}",
+            label=f"{self.cancer} ROC AUC: {auc_score:.4f}",
         )
 
         # J-score
@@ -232,6 +236,75 @@ class _FiguresTesting:
         )
 
         plt.cla()
+
+    def _normalise(self, df, how):
+        if how == "row":  # each model sums to 1 -> comparable across models
+            return df.div(df.sum(axis=1), axis=0), "Relative importance"
+        if how == "rank":  # 1 = most important within that model
+            return df.rank(axis=1, ascending=False, method="min"), "Rank (1 = most important)"
+        return df, "Importance"  # raw
+
+    def create_feature_importance_heatmap(
+            self,
+            data: dict,
+            normalise: str | None = "row",
+            no_cluster: bool = True,
+            annotate: bool = True,
+            keep_units: bool = False,
+            cmap: str = "viridis",
+            dpi: int = 300
+    ):
+        features = list(DataFeatures.features) + list(DataFeatures.categorical_features)
+        df = pd.DataFrame.from_dict(data, orient="index", columns=features)
+        
+        df_plot, cbar_label = self._normalise(df, normalise)
+        if not keep_units:
+            df_plot.columns = [re.sub(r"\s*\((?:pg/ml|ng/ml|U/ml|nM)\)\s*$", "", c) for c in df_plot.columns]
+
+        df_plot.index = [i.capitalize() if i.islower() else i for i in df_plot.index]
+    
+        # Rank heatmaps read better with the colour scale reversed (1 = bright)
+        cmap = cmap + "_r" if normalise == "rank" else cmap
+    
+        n_rows, n_cols = df_plot.shape
+        figsize = (max(10, 0.38 * n_cols + 3), max(4.5, 0.5 * n_rows + 3))
+    
+        common = dict(
+            cmap=cmap,
+            linewidths=0.4,
+            linecolor="white",
+            annot=annotate,
+            fmt=".2f" if normalise != "rank" else ".0f",
+            annot_kws={"size": 6},
+            cbar_kws={"label": cbar_label},
+        )
+    
+        if no_cluster:
+            fig, ax = plt.subplots(figsize=figsize)
+            sns.heatmap(df_plot, ax=ax, **common)
+            ax.set_xlabel("Feature")
+            ax.set_ylabel("Cancer type")
+            plt.setp(ax.get_xticklabels(), rotation=90)
+            plt.setp(ax.get_yticklabels(), rotation=0)
+            fig.tight_layout()
+        else:
+            # Hierarchical clustering groups similar cancers and co-important features
+            g = sns.clustermap(
+                df_plot,
+                figsize=figsize,
+                method="average",
+                metric="euclidean",
+                dendrogram_ratio=(0.12, 0.15),
+                cbar_pos=(0.02, 0.8, 0.02, 0.15),
+                **common,
+            )
+            g.ax_heatmap.set_xlabel("Feature")
+            g.ax_heatmap.set_ylabel("Cancer type")
+            plt.setp(g.ax_heatmap.get_xticklabels(), rotation=90)
+            plt.setp(g.ax_heatmap.get_yticklabels(), rotation=0)
+            fig = g.fig
+    
+        fig.savefig(self.results_path + "/feature_importances.jpeg", dpi=dpi, bbox_inches="tight")
 
     def create_confusion_matrix(
         self,
@@ -446,22 +519,32 @@ class _FiguresTesting:
 
         # Now generate results
         for res in test_file:
-            y_pred: np.ndarray = res["results"]["test_results"]["y_pred"]
-            y_truth: np.ndarray = res["results"]["test_results"]["y_truth"]
-            y_cancer_type: np.ndarray = res["results"]["source_test_labels"]
-            y_stage: np.ndarray = res["results"]["stage_test_labels"]
+            result_data = res["results"]
+            result_sets = result_data if isinstance(result_data, list) else [result_data]
 
-            # Create confusion matrix
-            self.create_confusion_matrix(y_pred, y_truth, y_pred.shape[1], self.results_path)  # noqa: W505
+            for result_set in result_sets:
+                test_results = result_set.get("test_results", result_set.get("train_results"))
+                if test_results is None:
+                    raise KeyError("Testing pickle result is missing test_results")
 
-            # Create file of sensitivities at given specificity threshold
-            self.sensitivities_at_specificity(y_pred, y_truth, y_cancer_type, y_stage)
+                y_pred: np.ndarray = test_results["y_pred"]
+                y_truth: np.ndarray = test_results["y_truth"]
+                y_cancer_type: np.ndarray = result_set["source_test_labels"]
+                y_stage: np.ndarray = result_set["stage_test_labels"]
 
-            # Create ROC curve
-            self.y_pred = y_pred
-            self.y_truth = y_truth
-            self.create_roc_curve(y_pred, y_truth)
+                # Create confusion matrix
+                self.create_confusion_matrix(y_pred, y_truth, y_pred.shape[1], self.results_path)  # noqa: W505
 
+                # Create file of sensitivities at given specificity threshold
+                if y_cancer_type.shape[0] == y_pred.shape[0] and y_stage.shape[0] == y_pred.shape[0]:
+                    self.sensitivities_at_specificity(y_pred, y_truth, y_cancer_type, y_stage)
+                else:
+                    print("Skipping sensitivities: test labels do not match prediction length.")
+
+                # Create ROC curve
+                self.y_pred = y_pred
+                self.y_truth = y_truth
+                self.create_roc_curve(y_pred, y_truth)
         return self
 
 
@@ -536,7 +619,7 @@ class _FiguresValidation:
         self.axes.plot(  # noqa: F841
             mean_fpr,
             mean_tpr,
-            label=f"{self.model_name} (AUC={self.auc_score:.4f}, STD={(self.auc_sem * np.sqrt(200)):.4f})",
+            label=f"{self.cancer} {self.model_name} (AUC={self.auc_score:.4f}, STD={(self.auc_sem * np.sqrt(200)):.4f})",
         )
 
         if self.repeat:
@@ -645,7 +728,7 @@ class _FiguresValidation:
         self._create_directories(file_path, model_name)
 
         for res in pkl_file:
-            self.auc_score: float = res["roc_auc"]
+            self.auc_score: float = res["auc"]
             self.auc_sem: float = res["auc_sem"]
 
             # Now we're looking at the average of the ROC curves produced
@@ -653,8 +736,8 @@ class _FiguresValidation:
             self.y_truth_sets = {}
 
             for index, res_set in enumerate(res["results"]):
-                self.y_pred_sets[index] = res_set["valid_results"]["y_pred"]
-                self.y_truth_sets[index] = res_set["valid_results"]["y_truth"]
+                self.y_pred_sets[index] = res_set["train_results"]["y_pred"]
+                self.y_truth_sets[index] = res_set["train_results"]["y_truth"]
 
             scaling = np.exp(np.linspace(-4, 4, 502))
 
@@ -821,10 +904,14 @@ def filter_files(
     file_opts = namedtuple("file_opts", ["cancer_type", "class_type", "model_filter", "model_name"])
 
     def split_file(file_path: str) -> file_opts:
-        if "Test.pkl" in file_path:
-            _, cancer, classification_mode, model_filter, model_name = re.split(r"\\", file_path)
+        path = Path(file_path)
+        parts = path.parts
+
+        if path.name.endswith("Test.pkl"):
+            _, _, cancer, classification_mode, model_filter, model_name = parts
         else:
-            _, cancer, classification_mode, _, model_filter, model_name = re.split(r"\\", file_path)
+            _, _, cancer, classification_mode, _, model_filter, model_name = parts
+
         return file_opts(cancer, classification_mode, model_filter, model_name)
 
     def match_opts(file_path: str, option: str | list[str] | None) -> str | None:

@@ -246,9 +246,10 @@ class Pipeline:
             try:
                 x_df = self.post_t_test(x_df)
             except FileNotFoundError:
-                # Only the fullModel_all files are in
-                # {self.base_path}/post_t_test/
-                return
+                print(
+                    f"Post-t-test features not found for {self.cancer} "
+                    f"({self.combos.classification_mode.value}); using all features."
+                )
 
             search.init_data(sample_ids, x_df, y_data, y_source, y_stage)
             results = search.run_search()
@@ -489,7 +490,50 @@ class Validation:
         model_type: ModelMode,
         data_features: DataFeatures,
     ) -> dict[int, dict]:
-        ...
+        """Evaluate progressively smaller feature sets using model importance."""
+        sample_ids, x_data, y_data, y_source, y_stage = data_bundle
+        if model_type == ModelMode.PROTEINS_ONLY:
+            feature_names = list(data_features.features)
+        else:
+            feature_names = list(data_features.features) + ["Ω score", "Age", "Race", "Sex"]
+
+        if x_data.shape[1] != len(feature_names):
+            raise ValueError(
+                f"Expected {len(feature_names)} features for {model_type.value}, "
+                f"but received {x_data.shape[1]}."
+            )
+
+        active_indices = list(range(x_data.shape[1]))
+        rfe_steps: dict[int, dict] = {}
+        step = 0
+
+        while active_indices:
+            search.init_data(
+                sample_ids,
+                x_data[:, active_indices],
+                y_data,
+                y_source,
+                y_stage,
+            )
+            results = search.run_search()
+            if not results:
+                raise ValueError("Recursive feature elimination produced no model results.")
+
+            result = results[0]
+            feature_importances = result.get("feature_importances")
+            if feature_importances is None:
+                raise ValueError("Recursive feature elimination requires feature importances.")
+
+            least_important = int(np.argmin(feature_importances))
+            rfe_steps[step] = {
+                "protein_removed": feature_names[active_indices[least_important]],
+                "auc": result["auc"],
+                "auc_sem": result["auc_sem"],
+            }
+            active_indices.pop(least_important)
+            step += 1
+
+        return rfe_steps
 
     def _create_dirs(self) -> None:
         """Creates the relevant validation result directories."""

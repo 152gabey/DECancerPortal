@@ -168,6 +168,8 @@ class TTest:
             # read the pkl file
             with open(pkl_file, "rb") as handle:
                 rfe_dict = pickle.load(handle)
+            if not isinstance(rfe_dict, dict) or not rfe_dict:
+                raise ValueError(f"RFE output is empty or malformed: {pkl_file}")
             rfe_df = pd.DataFrame(rfe_dict).T
 
             info.update(zip(["selected_df", "smallest_feature_set"], self._t_test_from_df(rfe_df)))
