@@ -70,18 +70,22 @@ steps to activate and run the database:
 
 1. In the SQLTools explorer, expand the connection you just created
 2. Right-click the connection name and select **New Query**
-3. Open the first initialization file: [database/00_init_database_v1.sql](/Users/gabeysinghe/Desktop/BIOM9450/DECancerPortal/database/00_init_database_v1.sql)
+3. Open the first initialization file: [database/00_init_database_v1.sql](database/00_init_database_v1.sql)
 4. Select all content (`Ctrl+A` / `Cmd+A`) and execute the query:
    - Click the **Execute** button (play icon) or press `Ctrl+Shift+Enter` / `Cmd+Shift+Enter`
    - This creates the `decancer_portal` database and schema
-5. Repeat for [database/01_data_import_v1.sql](/Users/gabeysinghe/Desktop/BIOM9450/DECancerPortal/database/01_data_import_v1.sql) to populate test data
-6. Optionally run [database/02_test_data_v1.sql](/Users/gabeysinghe/Desktop/BIOM9450/DECancerPortal/database/02_test_data_v1.sql) for additional queries
+5. Repeat for [database/01_data_import_v1.sql](database/01_data_import_v1.sql) to populate test data
+6. Optionally run [database/02_test_data_v1.sql](database/02_test_data_v1.sql) for additional queries
 
 #### Verify the database connection
 
 1. In SQLTools explorer, expand your connection
 2. You should see the `decancer_portal` database listed
 3. Expand it to view tables: `Patients`, `Cancer_Types`, `Users`, `Results`, etc.
+
+**Note:** The data import scripts have been fixed to respect foreign key dependencies.
+Patients must be inserted before Users, Samples, and Diagnosis records. If you're using
+an older version of `01_data_import_v1.sql`, update it from this repository.
 
 ### Alternative: Command-line database setup
 
@@ -124,6 +128,21 @@ python -m http.server 8080 --directory frontend
 Open `http://127.0.0.1:8080` in your browser. Configure your server to proxy
 `/api` requests to the FastAPI service at `http://127.0.0.1:8000`, or access
 both from the same origin.
+
+### 6. Generate predictions using the CLI tool (Optional)
+
+The standalone prediction tool enables batch processing and automated scheduling:
+
+```sh
+# Generate predictions for user ID 1 with progress output
+python predict_cancer.py 1 --verbose
+
+# Schedule daily predictions at 2 AM using cron
+# 0 2 * * * cd /path/to/DECancerPortal && python predict_cancer.py 1 >> predictions.log 2>&1
+```
+
+See [docs/predict_cancer_cli.md](docs/predict_cancer_cli.md) for detailed documentation,
+including configuration, output schema, troubleshooting, and integration examples.
 
 ## Nanoparticles
 Processed data is provided in `perseus_imputation/` for each of the 5 SPIONS and diluted plasma (DP). Note here that hyperparameters need to be specified for each algorithm which can be added to `src/parameters.py` when performing hyperparameter optimisation. Also not included is the steps taken for feature selection. Implementation fits between running the pipeline initially and before hyperparameter tuning found in `main.py`.
