@@ -59,6 +59,20 @@ db_settings = DatabaseSettings()
 settings = PredictionSettings()
 
 
+# Map CancerType enum to database Cancer_ID
+CANCER_TYPE_TO_ID = {
+    cs.CancerType.BREAST: 2,
+    cs.CancerType.COLORECTUM: 3,
+    cs.CancerType.ESOPHAGUS: 4,
+    cs.CancerType.LIVER: 5,
+    cs.CancerType.LUNG: 6,
+    cs.CancerType.OVARY: 7,
+    cs.CancerType.PANCREAS: 8,
+    cs.CancerType.STOMACH: 9,
+    cs.CancerType.PANCANCER: 10,  # Note: Pancancer uses 10, not in Cancer_Types table
+}
+
+
 def create_connection():
     """Create a new MySQL connection using environment variables."""
     return mysql.connector.connect(
@@ -78,19 +92,26 @@ def get_model_info(cancer_type: cs.CancerType) -> dict:
         cancer_type: The cancer type to load the model for
         
     Returns:
-        dict: Model metadata including the model_path
+        dict: Model metadata including the model_path and test_ids
     """
+    # Format cancer type name: use proper capitalization
+    # (CancerType.BREAST -> "Breast", CancerType.PANCANCER -> "pancancer")
+    cancer_name = cancer_type.name.capitalize() if cancer_type != cs.CancerType.PANCANCER else "pancancer"
+    
     dir_path = (
-        f"{settings.model_path}/{cancer_type.name.lower()}/"
+        f"{settings.model_path}/{cancer_name}/"
         f"cancer-healthy/"
-        f"fullModel_everyProtein"
+        f"fullModel_all"
     )
     metadata_path = f"{dir_path}/{settings.model_name}Test.pkl"
     model_path = f"{dir_path}/{settings.model_name}Model.pkl"
     
+    # The pickle file contains a list with one element (a dict)
     with open(metadata_path, "rb") as handle:
-        metadata = pickle.load(handle)
+        metadata_list = pickle.load(handle)
     
+    # Extract the dict from the list
+    metadata = metadata_list[0]
     metadata["model_path"] = model_path
     return metadata
 
@@ -111,26 +132,29 @@ def get_sample_inputs(connection, sample_code: str) -> list[float]:
     """
     cur = connection.cursor()
 
-    cur.execute(f"""
-    SELECT b.Model_Feature_Name, m.Value
-    FROM Biomarker_Measurements m
-    JOIN Samples s ON s.Sample_ID = m.Sample_ID
-    JOIN Biomarkers b ON b.Biomarker_ID = m.Biomarker_ID
-    WHERE s.Sample_Code = '{sample_code}'
-    ORDER BY b.Biomarker_ID;
-    """)
-    proteins = cur.fetchall()
+    try:
+        cur.execute(f"""
+        SELECT b.Model_Feature_Name, m.Value
+        FROM Biomarker_Measurements m
+        JOIN Samples s ON s.Sample_ID = m.Sample_ID
+        JOIN Biomarkers b ON b.Biomarker_ID = m.Biomarker_ID
+        WHERE s.Sample_Code = '{sample_code}'
+        ORDER BY b.Biomarker_ID;
+        """)
+        proteins = cur.fetchall()
 
-    cur.execute(f"""
-    SELECT p.Race_Type_ID AS Race, p.Sex_Type_ID AS Sex, s.Omega_Score AS omega_score, s.Age_At_Collection AS age
-    FROM Samples s
-    JOIN Patients p ON p.Patient_ID = s.Patient_ID
-    WHERE s.Sample_Code = '{sample_code}';
-    """)
-    categorical = cur.fetchone()
+        cur.execute(f"""
+        SELECT p.Race_Type_ID AS Race, p.Sex_Type_ID AS Sex, s.Omega_Score AS omega_score, s.Age_At_Collection AS age
+        FROM Samples s
+        JOIN Patients p ON p.Patient_ID = s.Patient_ID
+        WHERE s.Sample_Code = '{sample_code}';
+        """)
+        categorical = cur.fetchone()
 
-    features = [p[1] for p in proteins] + [c for c in categorical] if categorical else []
-    return features
+        features = [p[1] for p in proteins] + [c for c in categorical] if categorical else []
+        return features
+    finally:
+        cur.close()
 
 
 def save_test_data(user_id: int, verbose: bool = False) -> int:
@@ -160,24 +184,43 @@ def save_test_data(user_id: int, verbose: bool = False) -> int:
             print(f"  Processing {cancer_type.name}...")
         
         try:
-            results = get_model_info(cancer_type)
-            model = pickle.load(open(results["model_path"], "rb"))
+            metadata = get_model_info(cancer_type)
+            model = pickle.load(open(metadata["model_path"], "rb"))
             
-            for [sample_id] in results[0]["results"]["test_ids"]:
+            # Access test_ids from the metadata
+            test_ids = metadata["results"]["test_ids"]
+            for [sample_id] in test_ids:
                 if sample_id not in output:
                     output[sample_id] = []
 
-                features = get_sample_inputs(connection, sample_id)
-                prediction = model.predict(features)
-                feature_importance = model.feature_importances_
+                try:
+                    features = get_sample_inputs(connection, sample_id)
+                    if not features:
+                        if verbose:
+                            print(f"      Warning: No features for {sample_id}")
+                        continue
+                        
+                    # Reshape features from 1D array to 2D array for model prediction
+                    # predict() expects shape (n_samples, n_features) where n_samples=1
+                    features_2d = [[f for f in features]]
+                    prediction = model.predict(features_2d)
+                    
+                    # Extract feature importances from the pipeline's classifier step
+                    classifier = model.named_steps['classifier']
+                    feature_importance = classifier.feature_importances_
 
-                output[sample_id].append({
-                    "cancer_id": cancer_type.value,
-                    "probability": float(max(prediction)),
-                    "prediction_result": "cancer" if prediction.argmax() == 0 else "cancer-free",
-                    "highest_protein_influence": float(max(feature_importance[:39])),
-                    "highest_biomarker_id": int(feature_importance[:39].argmax()),
-                })
+                    output[sample_id].append({
+                        "cancer_id": CANCER_TYPE_TO_ID[cancer_type],
+                        "probability": float(max(prediction)),
+                        "prediction_result": "cancer" if prediction.argmax() == 0 else "cancer-free",
+                        "highest_protein_influence": float(max(feature_importance[:39])),
+                        "highest_biomarker_id": int(feature_importance[:39].argmax()),
+                    })
+                except Exception as sample_error:
+                    if verbose:
+                        print(f"      Sample error for {sample_id}: {sample_error}")
+                    continue
+                    
         except Exception as e:
             if verbose:
                 print(f"    Error: {e}")
@@ -200,7 +243,9 @@ def save_test_data(user_id: int, verbose: bool = False) -> int:
             sample_id = sample_id_row[0]
 
             best = max(output[sample_code], key=lambda x: x["probability"])
-            pancancer = next(x for x in output[sample_code] if x["cancer_id"] == 10)
+            # Pancancer exists if model was run, but check to be safe
+            pancancer_scores = [x for x in output[sample_code] if x["cancer_id"] == 10]
+            pancancer = pancancer_scores[0] if pancancer_scores else best
             
             cur.execute(f"""
               INSERT INTO Predictions (
@@ -222,7 +267,7 @@ def save_test_data(user_id: int, verbose: bool = False) -> int:
                 NULL, 
                 {best['highest_protein_influence']}, 
                 {best['highest_biomarker_id']}, 
-                '{settings.model_version}',
+                '{settings.model_version}'
               )
             """)
             prediction_id = cur.lastrowid
@@ -230,10 +275,13 @@ def save_test_data(user_id: int, verbose: bool = False) -> int:
             prediction_count += 1
             
             for scores in output[sample_code]:
-                cur.execute(f"""
-                  INSERT INTO Prediction_Scores (Prediction_ID, Cancer_ID, Probability)
-                  VALUES ({prediction_id}, {scores['cancer_id']}, {scores['probability']})
-                """)
+                # Only insert scores for cancer types that exist in the database (1-9)
+                # Pancancer (10) is not in Cancer_Types table so skip it
+                if scores['cancer_id'] != 10:
+                    cur.execute(f"""
+                      INSERT INTO Prediction_Scores (Prediction_ID, Cancer_ID, Probability)
+                      VALUES ({prediction_id}, {scores['cancer_id']}, {scores['probability']})
+                    """)
             connection.commit()
             
             if verbose:
@@ -241,6 +289,8 @@ def save_test_data(user_id: int, verbose: bool = False) -> int:
         except Exception as e:
             if verbose:
                 print(f"  ✗ Error saving predictions for sample {sample_code}: {e}")
+                import traceback
+                traceback.print_exc()
             connection.rollback()
             continue
     
