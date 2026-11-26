@@ -18,6 +18,7 @@ from src.cancerseek.constants import ValidationMode
 from src.cancerseek.hyperparameter_best import hyperparameter_best
 from src.cancerseek.paramsearch_util import Parameter
 from src.cancerseek.pipeline import combo_pipelines
+from src.cancerseek.pipeline import save_test_results
 from src.cancerseek.rfe_t_test import TTest
 from src.models.logisitic_regression import LogisticRegression as LogReg
 from src.models.multi_layer_perceptron import MultiLayerPerceptron
@@ -38,7 +39,7 @@ REFRESH_CACHE = False
 PIPELINE_FLAG = PipelineMode.TESTING
 RESULTS_PATH = f"Results/{PIPELINE_FLAG.value}"
 VALIDATION_FLAG = ValidationMode.RECURSIVE_FEATURE_ELIMINATION
-BEST_PARAMS_USED = True
+BEST_PARAMS_USED = False
 
 cancer_types = [
     CancerType.BREAST,
@@ -62,10 +63,7 @@ kde_methods = [KDEMethod.NONE]
 
 model_modes = [ModelMode.FULL_MODEL]
 
-filter_modes = [
-    FilterMode.POST_T_TEST,
-    FilterMode.EVERY_PROTEIN,
-]
+filter_modes = [FilterMode.EVERY_PROTEIN]
 
 # Setup for recursive feature elimination
 if PIPELINE_FLAG == PipelineMode.VALIDATING and VALIDATION_FLAG == ValidationMode.RECURSIVE_FEATURE_ELIMINATION:
@@ -150,6 +148,8 @@ with Parallel(n_jobs=1, verbose=50) as parallel:
         )
     ]
     value = parallel(delayed_funcs)
+if PIPELINE_FLAG == PipelineMode.TESTING:
+    save_test_results([result for result in value if result is not None])
 print(f"Total time taken: {time.time() - start} seconds.")
 
 if PIPELINE_FLAG == PipelineMode.VALIDATING:

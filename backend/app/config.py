@@ -4,6 +4,12 @@ from dataclasses import dataclass
 import os
 
 from dotenv import load_dotenv
+from sklearn.ensemble import RandomForestClassifier
+
+from src._types import ModelEstimator
+import src.cancerseek.constants as cs
+from src.models.random_forest import RandomForest
+from src.parameters import Parameter
 
 load_dotenv()
 
@@ -21,3 +27,27 @@ class Settings:
 
 
 settings = Settings()
+
+@dataclass(frozen=True)
+class ModelSettings:
+    model_path: str = os.getenv("MODEL_PATH", "Results/test")
+    cancer_types: list[cs.CancerType] = [
+        cs.CancerType.BREAST,
+        cs.CancerType.COLORECTUM,
+        cs.CancerType.ESOPHAGUS,
+        cs.CancerType.LIVER,
+        cs.CancerType.LUNG,
+        cs.CancerType.OVARY,
+        cs.CancerType.PANCREAS,
+        cs.CancerType.STOMACH,
+        cs.CancerType.PANCANCER,
+    ]
+    classification_mode: cs.ClassificationMode = cs.ClassificationMode.CANCER_HEALTHY
+    model_mode: cs.ModelMode = cs.ModelMode.FULL_MODEL
+    filter_mode: cs.FilterMode = cs.FilterMode.EVERY_PROTEIN
+    kde_method: cs.KDEMethod = cs.KDEMethod.NONE
+    model: type[ModelEstimator] = RandomForest
+    params: list[Parameter] = [Parameter(RandomForestClassifier, *el) for el in cs.Classifier.RF.value]
+    model_version: str = "v1.0"
+
+model_settings = ModelSettings()

@@ -21,8 +21,6 @@ This tool **decouples prediction from the backend**, enabling:
 
 ## Approach
 
-The tool refactors the original `backend/app/model.py` functions into a production-grade CLI application with the following design principles:
-
 ### 1. **Separation of Concerns**
 - **Model loading**: Isolated `get_model_info()` to load metadata and model paths
 - **Data retrieval**: Dedicated `get_sample_inputs()` to fetch features from the database
