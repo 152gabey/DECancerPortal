@@ -145,9 +145,11 @@ See [docs/predict_cancer_cli.md](docs/predict_cancer_cli.md) for detailed docume
 including configuration, output schema, troubleshooting, and integration examples.
 
 ## Nanoparticles
+
 Processed data is provided in `perseus_imputation/` for each of the 5 SPIONS and diluted plasma (DP). Note here that hyperparameters need to be specified for each algorithm which can be added to `src/parameters.py` when performing hyperparameter optimisation. Also not included is the steps taken for feature selection. Implementation fits between running the pipeline initially and before hyperparameter tuning found in `main.py`.
 
 Hyperparameters are in the form of a tuple:
+
 ```py
 params = (("name", (value1, value2, value3)),)
 ```
@@ -155,7 +157,9 @@ params = (("name", (value1, value2, value3)),)
 Run the pipeline with `python main.py`
 
 ## CancerSEEK
+
 Data is found in `cancerseek_data/`. Hyperparameters must be specified in the form of a tuple:
+
 ```py
 params = (("name", (value1, value2, value3)),)
 ```
