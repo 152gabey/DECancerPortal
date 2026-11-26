@@ -56,12 +56,6 @@ INSERT INTO Biomarkers (Biomarker_ID, Name, Unit) VALUES
   (38, 'TIMP-1', 'pg/ml'),
   (39, 'TIMP-2', 'pg/ml');
 
-INSERT INTO Users (User_ID, Username, Email, Password_Hash, FirstName, LastName, Role, Speciality, Patient_ID) VALUES
-  (1, 'admin', 'admin@decancer.demo', '$2y$10$ZhpfkL786RL3VEwzJ3ywSumK3lg3hQYOO7bWhgZkIemKERwobKKQ2', 'Alex', 'Admin', 'admin', NULL, NULL),
-  (2, 'researcher1', 'researcher1@decancer.demo', '$2y$10$vVQFKNSvLqDNk.xfLW0IPuqXaF37Gv2dnOndXc/VQrmsqDPf65rca', 'Riley', 'Researcher', 'researcher', 'Cancer genomics', NULL),
-  (3, 'oncologist1', 'oncologist1@decancer.demo', '$2y$10$11bOk6kejERZI2/1cm3Wf.UV7q2hhdMc6Ez6LEC0AA4zcrJt3qWfq', 'Olivia', 'Oncologist', 'oncologist', 'Medical oncology', NULL),
-  (4, 'patient1', 'patient1@decancer.demo', '$2y$10$ifadsLnC7OjJZAg6AxyyS.YTs5R03mbrJmA34rVuGhNO73usb6zNy', 'James', 'Hierro', 'patient', NULL, 1);
-
 INSERT INTO Patients (Patient_ID, FirstName, LastName, Date_of_Birth, Sex, Race, Country, Photo) VALUES
   (1, 'James', 'Hierro', '1955-08-05', 'Male', 'Caucasian', 'Ireland', NULL),
   (2, 'Christine', 'Davies', '1957-01-21', 'Female', 'Caucasian', 'Ireland', NULL),
@@ -1869,6 +1863,12 @@ INSERT INTO Patients (Patient_ID, FirstName, LastName, Date_of_Birth, Sex, Race,
   (1801, 'Marina', 'Niggli', '1955-06-09', 'Female', 'Caucasian', 'Portugal', NULL),
   (1802, 'Silvana', 'Olsson', '1967-02-23', 'Female', 'Caucasian', 'France', NULL),
   (1803, 'Claude', 'Gibson', '1956-10-19', 'Female', 'Black', 'United Kingdom', NULL);
+
+INSERT INTO Users (User_ID, Username, Email, Password_Hash, FirstName, LastName, Role, Speciality, Patient_ID) VALUES
+  (1, 'admin', 'admin@decancer.demo', '$2y$10$ZhpfkL786RL3VEwzJ3ywSumK3lg3hQYOO7bWhgZkIemKERwobKKQ2', 'Alex', 'Admin', 'admin', NULL, NULL),
+  (2, 'researcher1', 'researcher1@decancer.demo', '$2y$10$vVQFKNSvLqDNk.xfLW0IPuqXaF37Gv2dnOndXc/VQrmsqDPf65rca', 'Riley', 'Researcher', 'researcher', 'Cancer genomics', NULL),
+  (3, 'oncologist1', 'oncologist1@decancer.demo', '$2y$10$11bOk6kejERZI2/1cm3Wf.UV7q2hhdMc6Ez6LEC0AA4zcrJt3qWfq', 'Olivia', 'Oncologist', 'oncologist', 'Medical oncology', NULL),
+  (4, 'patient1', 'patient1@decancer.demo', '$2y$10$ifadsLnC7OjJZAg6AxyyS.YTs5R03mbrJmA34rVuGhNO73usb6zNy', 'James', 'Hierro', 'patient', NULL, 1);
 
 INSERT INTO Samples (Sample_ID, Sample_Code, Patient_ID, Uploaded_By, Collection_Date, Sample_Type, Age_At_Collection, Omega_Score, Mutation_Gene, Mutation_Type, Mutation_Detail, Chromosome, Position, Mutant_Allele_Frequency) VALUES
   (1, 'CRC 455 PLS 1', 1, 2, '2015-08-17', 'Plasma', 60, '2.96', 'TP53', 'Missense', 'p.K120E, c.358A>G', '17', NULL, '0.27'),
