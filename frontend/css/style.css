@@ -252,3 +252,105 @@ main, .main, .dash, .col { min-width: 0; }
 main, .main, .col { grid-template-columns: minmax(0, 1fr); }   /* let the single column shrink instead of growing to fit its widest child */
 .card-head h2 { white-space: nowrap; }
 @media (max-width: 1250px) { .dash { grid-template-columns: minmax(0, 1fr); } }
+
+/* ================= Version 3: biomarker bar chart on the dashboard ================= */
+.plot .bar-b-normal { fill: var(--ink); }
+.plot .bar-b-high { fill: var(--accent); }
+.plot .bar-b-low { fill: #C9C6DD; }
+.plot .baseline { stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.plot .val-label { fill: var(--ink); font-size: 12px; font-weight: 600; }
+.plot .cat-label { fill: var(--muted); font-size: 11px; }
+.dot.n { background: var(--ink); }
+.dot.h { background: var(--accent); }
+.dot.l { background: #C9C6DD; }
+.muted-text.small { font-size: .8rem; margin: -.5rem 0 1rem; }
+
+/* ================= Version 4: Predict results panel and feedback ================= */
+.result-top .big { display: block; font-size: 1.8rem; line-height: 1.2; letter-spacing: -0.02em; }
+.result-top .pill { margin-top: .35rem; }
+.note { font-size: .8rem; color: var(--muted); margin-top: .5rem; }
+.feedback { margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--line); display: grid; gap: .5rem; }
+.feedback h3 { margin: 0 0 .25rem; }
+.feedback label { font-size: .8rem; font-weight: 600; }
+.feedback select, .feedback textarea { font: inherit; font-size: .9rem; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: .55rem .8rem; width: 100%; resize: vertical; }
+.feedback .button { justify-self: start; margin-top: .5rem; }
+.choice { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .5rem; }
+.choice label { position: relative; font-weight: 500; }
+.choice input { position: absolute; opacity: 0; }
+.choice span { display: inline-block; background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: .4rem 1rem; font-size: .85rem; cursor: pointer; }
+.choice input:checked + span { background: var(--accent); border-color: var(--accent); color: #fff; }
+.choice input:focus-visible + span { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* ================= Version 5: Patients list and patient detail ================= */
+.pill.neutral { background: #ECECF1; color: #4A4858; }
+.toolbar { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; }
+.toolbar input[type="search"] { flex: 1; min-width: 220px; font: inherit; font-size: .9rem; background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: .65rem 1.1rem; }
+.toolbar select { width: auto; border-radius: 999px; padding: .6rem 1rem; }
+.add-patient summary { cursor: pointer; font-weight: 700; letter-spacing: -0.02em; }
+.add-patient form { margin-top: 1rem; display: grid; gap: 1rem; }
+.person-cell { display: flex; align-items: center; gap: .75rem; text-decoration: none; }
+.person-cell small { display: block; color: var(--muted); font-size: .8rem; }
+.pager { display: flex; gap: .4rem; justify-content: flex-end; margin-top: 1rem; font-size: .85rem; }
+.pager a, .pager span { padding: .4rem .8rem; border-radius: 999px; background: var(--panel); text-decoration: none; }
+.pager a[aria-current] { background: var(--accent); color: #fff; }
+.pager .disabled { color: var(--muted); opacity: .6; }
+
+.patient { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+.profile { text-align: center; }
+.profile h2 { margin: .75rem 0 0; font-size: 1.3rem; }
+.profile .dl { text-align: left; margin-top: 1.25rem; }
+.profile-actions { display: grid; gap: .6rem; margin-top: 1.25rem; }
+.profile-actions .button { text-align: center; }
+.avatar.xl { width: 84px; height: 84px; font-size: 1.6rem; margin: 0 auto; }
+.dl { display: grid; gap: .1rem; margin: 0; }
+.dl > div { display: flex; justify-content: space-between; gap: 1rem; padding: .6rem 0; border-top: 1px solid var(--line); font-size: .9rem; }
+.dl > div:first-child { border-top: 0; }
+.dl dt { color: var(--muted); }
+.dl dd { margin: 0; font-weight: 600; text-align: right; }
+.unit { color: var(--muted); font-size: .8rem; }
+@media (max-width: 1000px) { .patient { grid-template-columns: minmax(0, 1fr); } }
+
+/* ================= Version 6: Login page and sign-out link ================= */
+.signout { font-size: .85rem; }
+.field input[type="password"], .field input[type="date"] { font: inherit; font-size: .9rem; color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: .55rem .8rem; width: 100%; }
+.button.wide { width: 100%; text-align: center; padding: .8rem 1.1rem; font-size: .95rem; }
+.alert { background: var(--critical-soft); color: var(--critical-text); border-radius: 12px; padding: .65rem .9rem; font-size: .9rem; font-weight: 500; }
+.alert[hidden] { display: none; }
+
+.login-wrap { min-height: calc(100vh - 48px); display: grid; place-items: center; }
+.login-card { display: grid; grid-template-columns: 1fr 1fr; width: 100%; max-width: 980px; background: var(--shell); border-radius: 36px; padding: 16px; box-shadow: 0 24px 60px rgba(20, 19, 26, .08); }
+.login-art { position: relative; min-height: 540px; border-radius: 28px; overflow: hidden; padding: 1.5rem; background: radial-gradient(circle at 50% 45%, #FFFFFF 0%, var(--panel) 65%); }
+.login-art .brand { position: relative; z-index: 1; padding: 0; }
+.login-art .helix { height: 80%; top: 50%; }
+.login-art-text { position: absolute; z-index: 1; left: 1.5rem; right: 1.5rem; bottom: 1.5rem; }
+.login-art-text h2 { font-size: 1.4rem; line-height: 1.25; margin-bottom: .35rem; }
+.login-art-text p { color: var(--muted); font-size: .9rem; }
+.login-form { display: grid; align-content: center; gap: 1rem; padding: 2rem 2.5rem; }
+.login-form h1 { font-size: 2rem; }
+.login-form form { display: grid; gap: 1rem; margin-top: .25rem; }
+@media (max-width: 800px) {
+  .login-card { grid-template-columns: minmax(0, 1fr); border-radius: 28px; }
+  .login-art { min-height: 220px; }
+  .login-art-text { display: none; }
+  .login-form { padding: 1.5rem 1rem; }
+}
+
+/* ================= About page ================= */
+.prose h2 { margin-bottom: .6rem; }
+.prose p { font-size: .92rem; color: #3A3946; margin-top: .6rem; max-width: 75ch; }
+.prose ul, .prose ol { margin: .6rem 0 0; padding-left: 1.2rem; font-size: .92rem; color: #3A3946; display: grid; gap: .5rem; max-width: 75ch; }
+.prose a { color: var(--accent); font-weight: 600; text-decoration: none; }
+.prose a:hover { text-decoration: underline; }
+.prose .dl dd { font-weight: 400; text-align: left; max-width: 60%; }
+.prose .dl > div { align-items: flex-start; }
+.intro-card { background: var(--accent-soft); }
+.intro-card .badge { background: #fff; }
+.intro-card h2 { margin-top: .75rem; font-size: 1.4rem; }
+.notice { background: #fff; border-radius: 14px; padding: .75rem 1rem; }
+.about-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.25rem; }
+.steps li::marker { font-weight: 700; color: var(--accent); }
+
+/* About page: line the descriptions up in one column, whatever their length */
+.prose .dl > div { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 1.5rem; justify-content: start; }
+.prose .dl dd { max-width: none; text-align: left; }
+@media (max-width: 700px) { .prose .dl > div { grid-template-columns: minmax(0, 1fr); gap: .2rem; } }

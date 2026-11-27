@@ -63,4 +63,5 @@ Thumbs.db
 # Environment files
 .venv
 .env
-.vscode
+.vscodefrontend/includes/config.php
+frontend/includes/config.php

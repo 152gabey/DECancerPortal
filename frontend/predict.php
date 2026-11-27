@@ -1,50 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Predict | DECancer Portal</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css">
-</head>
-<body>
-<div class="shell">
-  <!-- Hidden checkbox: the Menu button (a label) ticks it, and the CSS slides the sidebar in on phones. -->
-  <input type="checkbox" id="nav-toggle" class="nav-toggle" aria-label="Show or hide the menu">
-
-  <aside class="sidebar">
-    <a class="brand" href="index.html"><span class="brand-mark"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3c0 5 10 5 10 9s-10 4-10 9"/><path d="M17 3c0 5-10 5-10 9s10 4 10 9"/><path d="M8.5 6.5h7M8.5 17.5h7"/></svg></span>DECancer</a>
-    <nav aria-label="Main">
-      <a href="index.html" class="nav-link"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg><span>Dashboard</span></a><a href="patients.html" class="nav-link"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M17 14a5 5 0 0 1 4.5 5"/></svg><span>Patients</span></a><a href="mutations.html" class="nav-link"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3c0 5 10 5 10 9s-10 4-10 9"/><path d="M17 3c0 5-10 5-10 9s10 4 10 9"/><path d="M8.5 6.5h7M8.5 17.5h7"/></svg><span>Mutations</span></a><a href="predict.html" class="nav-link active" aria-current="page"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg><span>Predict</span></a><a href="trends.html" class="nav-link"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg><span>Trends</span></a><a href="model.html" class="nav-link"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>Model performance</span></a><a href="about.html" class="nav-link"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg><span>About</span></a>
-    </nav>
-    <div class="help">
-      <p>Reading a result can be tricky.</p>
-      <div class="help-row">
-        <span>See how likelihood and risk are scored</span>
-        <a class="round-btn dark" href="about.html" aria-label="How results are scored"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-      </div>
-    </div>
-  </aside>
-
-  <div class="main">
-    <header class="topbar">
-      <label for="nav-toggle" class="menu-button">Menu</label>
-      <div class="titles">
-        <p>Welcome back, Dr. Placeholder</p>
-        <h1>Predict</h1>
-      </div>
-      <form class="search" action="mutations.html" method="get" role="search">
-        <input type="search" name="q" placeholder="Search genes or mutations" aria-label="Search genes or mutations">
-        <button class="round-btn dark" type="submit" aria-label="Search"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></button>
-      </form>
-      <div class="user">
-        <span class="avatar">DP</span>
-        <span class="user-text">Dr. Placeholder<small>Researcher</small></span>
-      </div>
-    </header>
-
-    <main>
+<?php
+$pageTitle = 'Predict';
+$activePage = 'predict';
+require __DIR__ . '/includes/auth.php';
+include __DIR__ . '/includes/header.php';
+?>
 <div class="predict">
   <form class="card form" action="#" method="post">
     <fieldset class="group-box">
@@ -54,7 +13,7 @@
         <div class="field"><label for="sample_id">Sample ID</label><input id="sample_id" name="sample_id" type="text" placeholder="S-0412"></div>
         <div class="field"><label for="age">Age</label><input id="age" name="age" type="number" min="0" max="120"></div>
         <div class="field"><label for="sex">Sex</label><select id="sex" name="sex"><option value="">Select</option><option>Female</option><option>Male</option></select></div>
-        <div class="field"><label for="race">Race</label><select id="race" name="race"><option value="">Select</option><option>Asian</option><option>Black</option><option>Caucasian</option><option>Hispanic</option><option>Other</option></select></div>
+        <div class="field"><label for="race">Race</label><select id="race" name="race"><option value="">Select</option><option>Asian</option><option>Black</option><option>Black/Hispanic</option><option>Caucasian</option><option>Caucasian/Hispanic</option><option>Hispanic</option><option>Other</option><option>Unknown</option></select></div>
         <div class="field"><label for="omega">&Omega; score</label><input id="omega" name="omega" type="number" step="any"></div>
       </div>
     </fieldset>
@@ -93,11 +52,11 @@
     <p class="muted-text">This is what you will see after running a prediction. The numbers below are placeholders.</p>
 
     <div class="result-top">
-      <div><small>Overall risk</small><span class="pill high">High</span></div>
+      <div><small>Chance of cancer</small><strong class="big">0.88</strong><span class="pill high">Cancer</span></div>
       <div><small>Highest protein influence</small><strong>CA-125</strong></div>
     </div>
 
-    <h3>Likelihood by cancer type</h3>
+    <h3>Likelihood by organ</h3>
         <div class="bar-row wide">
           <span class="bar-label">Breast</span>
           <div class="bar-track"><div class="bar-fill muted" style="width: 4%"></div></div>
@@ -129,11 +88,6 @@
           <span class="bar-value">0.82</span>
         </div>
         <div class="bar-row wide">
-          <span class="bar-label">pancancer</span>
-          <div class="bar-track"><div class="bar-fill muted" style="width: 88%"></div></div>
-          <span class="bar-value">0.88</span>
-        </div>
-        <div class="bar-row wide">
           <span class="bar-label">Pancreas</span>
           <div class="bar-track"><div class="bar-fill muted" style="width: 7%"></div></div>
           <span class="bar-value">0.07</span>
@@ -143,11 +97,7 @@
           <div class="bar-track"><div class="bar-fill muted" style="width: 3%"></div></div>
           <span class="bar-value">0.03</span>
         </div>
-        <div class="bar-row wide">
-          <span class="bar-label">missing-cancer</span>
-          <div class="bar-track"><div class="bar-fill muted" style="width: 3%"></div></div>
-          <span class="bar-value">0.03</span>
-        </div>
+    <p class="note">Missing-cancer score: 0.03</p>
 
     <h3>Most influential biomarkers</h3>
         <div class="bar-row wide">
@@ -176,11 +126,21 @@
           <span class="bar-value">0.05</span>
         </div>
 
-    <p class="meta">Run by Dr. Placeholder &middot; 26 Nov 2026, 09:14</p>
+    <p class="meta">Run by Dr. Placeholder &middot; 26 Nov 2026, 09:14 &middot; DeCancer v1.0</p>
+
+    <form class="feedback" action="#" method="post">
+      <h3>Was this prediction right?</h3>
+      <div class="choice" role="radiogroup" aria-label="Feedback on this prediction">
+        <label><input type="radio" name="feedback_type" value="correct"><span>Correct</span></label>
+        <label><input type="radio" name="feedback_type" value="incorrect"><span>Incorrect</span></label>
+        <label><input type="radio" name="feedback_type" value="unsure"><span>Unsure</span></label>
+      </div>
+      <label for="suggested">If incorrect, what do you think it is?</label>
+      <select id="suggested" name="suggested_cancer"><option value="">Select (optional)</option><option>Breast</option><option>Colorectum</option><option>Esophagus</option><option>Liver</option><option>Lung</option><option>Ovary</option><option>Pancreas</option><option>Stomach</option><option>Normal (cancer-free)</option></select>
+      <label for="comment">Comment (optional)</label>
+      <textarea id="comment" name="comment" rows="3"></textarea>
+      <button class="button" type="submit">Send feedback</button>
+    </form>
   </aside>
 </div>
-    </main>
-  </div>
-</div>
-</body>
-</html>
+<?php include __DIR__ . '/includes/footer.php'; ?>
