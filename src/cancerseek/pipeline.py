@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import ast
+import json
 import os
 import pickle
+from enum import Enum
 from itertools import product
 from pathlib import Path
+from typing import Any
 from typing import cast
 from typing import Sequence
 from typing import TYPE_CHECKING
@@ -28,6 +31,27 @@ from .utility import DataFeatures
 
 if TYPE_CHECKING:
     from .._types import ModelEstimator
+
+
+def _json_default(value: Any) -> Any:
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, Enum):
+        return value.value
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
+
+def save_test_results(results: Sequence[tuple[Path, dict[str, Any]]]) -> None:
+    """Write one JSON array per configuration from the current test run."""
+    grouped: dict[Path, list[dict[str, Any]]] = {}
+    for path, result in results:
+        grouped.setdefault(path, []).append(result)
+    for path, entries in grouped.items():
+        content = json.dumps(entries, default=_json_default, allow_nan=False, indent=2)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content + "\n", encoding="utf-8")
 
 
 def combo_pipelines(
@@ -107,7 +131,7 @@ class Pipeline:
         if self.constant_options.best_params:
             self.hyperparameters = self._get_best_parameters()
 
-    def run_pipeline(self) -> None:
+    def run_pipeline(self) -> tuple[Path, dict[str, Any]] | None:
         """Runs the pipeline based on the options for each combination."""
         sample_ids, y_data, y_source, y_stage, x_ordinal = self._select_data(
             self.cancer,
@@ -130,9 +154,10 @@ class Pipeline:
         data_bundle = sample_ids, x_df, y_data, y_source, y_stage
 
         if self.constant_options.pipeline_flag == PipelineMode.TESTING:
-            self.test_pipeline(search, data_bundle)
+            return self.test_pipeline(search, data_bundle)
         elif self.constant_options.pipeline_flag == PipelineMode.VALIDATING:
             self.validation_pipeline(search, data_bundle)
+        return None
 
     # Import union features file
     def post_t_test(self, df: np.ndarray) -> np.ndarray:
@@ -172,7 +197,7 @@ class Pipeline:
         self,
         search: ParameterSearch,
         data_bundle: tuple[np.ndarray, ...],
-    ) -> None:
+    ) -> tuple[Path, dict[str, Any]]:
         """Runs the testing pipeline.
 
         Parameters
@@ -185,30 +210,34 @@ class Pipeline:
         print("THIS IS THE TESTING PIPELINE")
 
         sample_ids, x_df, y_data, y_source, y_stage = data_bundle
-        try:
-            x_df_post_t_test = self.post_t_test(x_df)
-            testing_combos = zip([x_df, x_df_post_t_test], ["all", "postTTest"])
-        except FileNotFoundError:
-            # Only the fullModel_all files are in
-            # {self.base_path}/post_t_test/
-            testing_combos = zip([x_df], ["all"])
+        if self.combos.filter_mode == FilterMode.POST_T_TEST:
+            x_df = self.post_t_test(x_df)
+        elif self.combos.filter_mode != FilterMode.EVERY_PROTEIN:
+            raise ValueError(f"Unsupported testing filter mode: {self.combos.filter_mode.value}")
 
-        for df, signature in testing_combos:
+        search.init_data(sample_ids, x_df, y_data, y_source, y_stage)
+        results = search.run_search()
 
-            search.init_data(sample_ids, df, y_data, y_source, y_stage)
-            results = search.run_search()
+        savedir = (
+            f"{self.constant_options.results_path}/{self.cancer}/"
+            f"{self.combos.classification_mode.value}/"
+            f"{self.combos.model_mode.value}_{self.combos.filter_mode.value}"
+        )
+        Path(savedir).mkdir(parents=True, exist_ok=True)
+        savepath = f"{savedir}/{search.model.__name__}Test"  # type: ignore
+        print(f"Saving to {savepath}.pkl ...")
 
-            savedir = (
-                f"{self.constant_options.results_path}/{self.cancer}/"
-                f"{self.combos.classification_mode.value}/{self.combos.model_mode.value}_{signature}"
-            )
-            Path(savedir).mkdir(parents=True, exist_ok=True)
-            savepath = f"{savedir}/{search.model.__name__}Test"  # type: ignore
-            print(f"Saving to {savepath}.pkl ...")
-
-            with open(f"{savepath}.pkl", "wb") as handle:
-                pickle.dump(results, handle, protocol=pickle.HIGHEST_PROTOCOL)
-                pd.DataFrame(results).to_excel(f"{savepath}.xlsx")
+        with open(f"{savepath}.pkl", "wb") as handle:
+            pickle.dump(results, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        with open(f"{savedir}/{search.model.__name__}Model.pkl", "wb") as handle:
+            pickle.dump(search.trained_model, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        json_path = (
+            Path(self.constant_options.results_path)
+            / self.combos.classification_mode.value
+            / f"{self.combos.model_mode.value}_{self.combos.filter_mode.value}"
+            / f"{search.model.__name__}_all.json"
+        )
+        return json_path, {"cancer_type": self.cancer, **results[0]}
 
     def validation_pipeline(
         self,

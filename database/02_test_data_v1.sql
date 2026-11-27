@@ -9,7 +9,9 @@ USE decancer_portal;
 -- ------------------------------------------------------------
 -- 1. Row counts (run this first)
 -- ------------------------------------------------------------
-SELECT 'Cancer_Types' AS tbl, COUNT(*) AS n FROM Cancer_Types
+SELECT 'Sex_Types' AS tbl, COUNT(*) AS n FROM Sex_Types
+UNION ALL SELECT 'Race_Types', COUNT(*) FROM Race_Types
+UNION ALL SELECT 'Cancer_Types', COUNT(*) FROM Cancer_Types
 UNION ALL SELECT 'Biomarkers', COUNT(*) FROM Biomarkers
 UNION ALL SELECT 'Patients', COUNT(*) FROM Patients
 UNION ALL SELECT 'Users', COUNT(*) FROM Users
@@ -19,7 +21,9 @@ UNION ALL SELECT 'Biomarker_Measurements', COUNT(*) FROM Biomarker_Measurements
 UNION ALL SELECT 'Predictions', COUNT(*) FROM Predictions
 UNION ALL SELECT 'Prediction_Scores', COUNT(*) FROM Prediction_Scores
 UNION ALL SELECT 'Prediction_Feedback', COUNT(*) FROM Prediction_Feedback;
--- Expected (10 rows):
+-- Expected (12 rows):
+--   ('Sex_Types', 2)
+--   ('Race_Types', 8)
 --   ('Cancer_Types', 9)
 --   ('Biomarkers', 39)
 --   ('Patients', 1803)
@@ -103,10 +107,12 @@ ORDER BY n_patients DESC, ct.Cancer_Name;
 -- ------------------------------------------------------------
 -- 4. Race and sex categories (must match what the model was trained on)
 -- ------------------------------------------------------------
-SELECT Race, Sex, COUNT(*) AS n
-FROM Patients
-GROUP BY Race, Sex
-ORDER BY Race, Sex;
+SELECT rt.Race_Name, st.Sex_Name, COUNT(*) AS n
+FROM Patients p
+JOIN Race_Types rt ON rt.Race_Type_ID = p.Race_Type_ID
+JOIN Sex_Types st ON st.Sex_Type_ID = p.Sex_Type_ID
+GROUP BY rt.Race_Type_ID, st.Sex_Type_ID, rt.Race_Name, st.Sex_Name
+ORDER BY rt.Race_Name, st.Sex_Name;
 -- Expected: 16 rows, first 3:
 --   ('Asian', 'Female', 159)
 --   ('Asian', 'Male', 163)
@@ -124,7 +130,39 @@ ORDER BY Biomarker_ID;
 --   (3, 'AXL (pg/ml)')
 
 -- ------------------------------------------------------------
--- 6. Model input: the 39 protein values of one sample, in model order
+-- 6. Overview of prediction information
+-- ------------------------------------------------------------
+SELECT
+  s.sample_code as sample,
+  pa.firstName,
+  pa.lastName,
+  rt.race_name as race,
+  st.sex_name as sex,
+  s.age_at_collection as age,
+  s.mutation_gene as mutated_DNA,
+  c.cancer_name as predicted_cancer,
+  ps.probability as likelihood,
+  b.name as protein_of_interest,
+  p.highest_protein_influence as protein_influence
+FROM Predictions p
+JOIN Samples s ON p.sample_id = s.sample_id
+JOIN Patients pa ON s.patient_id = pa.patient_id
+JOIN Prediction_Scores ps ON ps.probability = (
+  SELECT MAX(Probability)
+  FROM Prediction_Scores
+  WHERE Prediction_ID = p.prediction_id
+)
+JOIN Biomarkers b ON p.highest_biomarker_id = b.biomarker_id
+JOIN Race_Types rt ON pa.race_type_id = rt.race_type_id
+JOIN Sex_Types st ON pa.sex_type_id = st.sex_type_id
+JOIN Cancer_types c ON c.cancer_id = ps.cancer_id
+ORDER BY likelihood DESC
+;
+-- Expected 835 rows, first:
+-- ('PANCA 1025 PLS 1', 'Xavier', 'Mans', 'Caucasian', 'Male',  79, 'KRAS', 'Pancreas', 0.8833333333333333, 'CA 15-3', 0.13842009219631207)
+
+-- ------------------------------------------------------------
+-- 7. Model input: the 39 protein values of one sample, in model order
 -- ------------------------------------------------------------
 SELECT b.Model_Feature_Name, m.Value
 FROM Biomarker_Measurements m
@@ -138,21 +176,24 @@ ORDER BY b.Biomarker_ID;
 --   ('AXL (pg/ml)', 2772.96)
 
 -- ------------------------------------------------------------
--- 7. Model input: Race, Sex, Omega score and Age of the same sample
+-- 8. Model input: Race, Sex, Omega score and Age of the same sample
 -- ------------------------------------------------------------
-SELECT p.Race, p.Sex, s.Omega_Score AS omega_score, s.Age_At_Collection AS age
+SELECT p.Race_Type_ID AS Race, p.Sex_Type_ID AS Sex, s.Omega_Score AS omega_score, s.Age_At_Collection AS age
 FROM Samples s
 JOIN Patients p ON p.Patient_ID = s.Patient_ID
 WHERE s.Sample_Code = 'CRC 456 PLS 1';
 -- Expected (1 row):
---   ('Caucasian', 'Female', 2.45, 59)
+--   (3.0, 0.0, 2.45, 59)
 
 -- ------------------------------------------------------------
--- 8. Patient detail page (oncologist view)
+-- 9. Patient detail page (oncologist view)
 -- ------------------------------------------------------------
-SELECT p.Patient_ID, p.FirstName, p.LastName, p.Date_of_Birth, p.Sex, p.Race, p.Country,
+SELECT p.Patient_ID, p.FirstName, p.LastName, p.Date_of_Birth, 
+       st.Sex_Name AS Sex, rt.Race_Name AS Race, p.Country,
        ct.Cancer_Name, d.Cancer_Stage, d.Histopathology, d.Treatment, s.Sample_Code
 FROM Patients p
+JOIN Sex_Types st ON st.Sex_Type_ID = p.Sex_Type_ID
+JOIN Race_Types rt ON rt.Race_Type_ID = p.Race_Type_ID
 JOIN Diagnosis d ON d.Patient_ID = p.Patient_ID
 JOIN Cancer_Types ct ON ct.Cancer_ID = d.Cancer_ID
 JOIN Samples s ON s.Sample_ID = d.Sample_ID
@@ -161,7 +202,7 @@ WHERE p.Patient_ID = 1;
 --   (1, 'James', 'Hierro', '1955-08-05', 'Male', 'Caucasian', 'Ireland', 'Colorectum', 'I', 'Adenocarcinoma', 'Surgical resection', 'CRC 455 PLS 1')
 
 -- ------------------------------------------------------------
--- 9a. Filter by gene: patients with a KRAS mutation (first 10 shown)
+-- 10a. Filter by gene: patients with a KRAS mutation (first 10 shown)
 -- ------------------------------------------------------------
 SELECT p.Patient_ID, p.FirstName, p.LastName, s.Mutation_Gene, s.Mutation_Detail, s.Chromosome
 FROM Samples s
@@ -172,7 +213,7 @@ LIMIT 10;
 -- Expected: 115 matching rows in total (first 10 shown)
 
 -- ------------------------------------------------------------
--- 9b. Patients with the same mutation (TP53 p.R248Q)
+-- 10b. Patients with the same mutation (TP53 p.R248Q)
 -- ------------------------------------------------------------
 SELECT p.Patient_ID, p.FirstName, p.LastName, s.Mutation_Detail
 FROM Samples s
@@ -183,7 +224,7 @@ LIMIT 10;
 -- Expected: 15 matching rows in total (first 10 shown)
 
 -- ------------------------------------------------------------
--- 9c. Filter by chromosome (chromosome 17)
+-- 10c. Filter by chromosome (chromosome 17)
 -- ------------------------------------------------------------
 SELECT COUNT(*) AS samples_on_chr17
 FROM Samples
@@ -192,7 +233,7 @@ WHERE Chromosome = '17';
 --   (1315)
 
 -- ------------------------------------------------------------
--- 9d. Filter by position (only splice-site rows have a position)
+-- 10d. Filter by position (only splice-site rows have a position)
 -- ------------------------------------------------------------
 SELECT COUNT(*) AS samples_with_position
 FROM Samples
@@ -201,7 +242,7 @@ WHERE Position IS NOT NULL;
 --   (40)
 
 -- ------------------------------------------------------------
--- 10a. Researcher view: number of mutations per gene
+-- 10e. Researcher view: number of mutations per gene
 -- ------------------------------------------------------------
 SELECT Mutation_Gene, COUNT(*) AS n_mutations
 FROM Samples
@@ -214,7 +255,7 @@ ORDER BY n_mutations DESC, Mutation_Gene;
 --   ('FBXW7', 45)
 
 -- ------------------------------------------------------------
--- 10b. Researcher view: mutations in selected genes, split by cancer type
+-- 10f. Researcher view: mutations in selected genes, split by cancer type
 -- ------------------------------------------------------------
 SELECT s.Mutation_Gene, ct.Cancer_Name, COUNT(*) AS n
 FROM Samples s
@@ -226,7 +267,7 @@ ORDER BY s.Mutation_Gene, ct.Cancer_Name;
 -- Expected: 25 rows
 
 -- ------------------------------------------------------------
--- 10c. Mutation types
+-- 10g. Mutation types
 -- ------------------------------------------------------------
 SELECT Mutation_Type, COUNT(*) AS n
 FROM Samples
