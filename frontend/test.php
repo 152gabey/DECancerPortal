@@ -23,6 +23,9 @@ function request_prediction(int $id): array {
     $decoded = json_decode($response, true);
     if ($status < 200 || $status >= 300 || !is_array($decoded)) {
         $detail = is_array($decoded) ? ($decoded['detail'] ?? 'Unexpected API response') : 'Invalid API response';
+        if (!is_string($detail)) {
+            $detail = 'The API rejected the request. Check the Sample_ID and try again.';
+        }
         throw new RuntimeException('Prediction failed: ' . $detail);
     }
     return $decoded;

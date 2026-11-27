@@ -52,6 +52,11 @@ CANCER_TYPE_TO_ID = {
     cs.CancerType.PANCANCER: 10,
 }
 
+
+class InvalidSampleError(ValueError):
+    """The saved sample cannot be represented as valid model inputs."""
+
+
 def create_connection():
     """Open a MySQL connection using environment-based settings."""
     return mysql.connector.connect(
@@ -209,7 +214,9 @@ def run_prediction(sample_id: int) -> dict:
         cursor.close()
         connection.close()
     if len(features) != 43:
-        raise ValueError("Sample must have all 39 biomarkers and model-supported race/sex values")
+        raise InvalidSampleError(
+            "Sample must have all 39 biomarkers and model-supported race/sex values"
+        )
     outputs = [predict_one_model(cancer_type, features) for cancer_type in settings.cancer_types]
     cancer_outputs = [item for item in outputs if item["cancer_id"] != 10]
     pancancer_outputs = [item for item in outputs if item["cancer_id"] == 10]
