@@ -64,7 +64,7 @@ This directory contains MySQL initialization and data import scripts for the DEC
 
 **Run:** Optional, after `01_data_import_v1.sql` for testing
 
-### 03_add_race_sex_types_v1.sql
+### migrations/01_add_race_sex_types_v1.sql
 **Purpose:** Migration script for existing databases
 
 **What it does:**
@@ -74,6 +74,10 @@ This directory contains MySQL initialization and data import scripts for the DEC
 - Adds foreign key constraints after data migration
 
 **Run:** Only if you have an existing database that needs to be updated. Skip if using `00_init_database_v1.sql` for a fresh installation.
+
+The fresh-install import maps the source's zero-based sex and race codes to the
+one-based IDs in `Sex_Types` and `Race_Types`, and inserts patients using
+`Sex_Type_ID` and `Race_Type_ID`.
 
 **Migration Steps:**
 1. Run this script on an existing database
@@ -106,10 +110,10 @@ mysql -h 127.0.0.1 -u root -p decancer_portal < 02_test_data_v1.sql
 
 ### For Existing Databases
 
-If you have an existing database without the lookup tables, run the migration script:
+If you have an existing database with the old `Sex` and `Race` columns, run the migration script:
 
 ```bash
-mysql -h 127.0.0.1 -u root -p decancer_portal < 03_add_race_sex_types_v1.sql
+mysql -h 127.0.0.1 -u root -p decancer_portal < migrations/01_add_race_sex_types_v1.sql
 ```
 
 ## Data Characteristics
