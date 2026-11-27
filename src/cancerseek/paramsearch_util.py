@@ -12,6 +12,7 @@ import pandas as pd
 from sklearn.model_selection import ShuffleSplit
 from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline as SklearnPipeline
 from sklearn.preprocessing import StandardScaler
 from src.models.random_forest import RandomForest
 from src.parameters import Parameter
@@ -178,13 +179,15 @@ class ParameterSearch:
             y_source_test,
             y_stage_test,
         )
-        results = self._parameter_search(data_bundle)
+        results = self._parameter_search(data_bundle, x_scaler)
 
         return results
 
-    def _parameter_search(self, data: DataSplit) -> list[dict[str, Any]]:
+    def _parameter_search(self, data: DataSplit, scaler: StandardScaler) -> list[dict[str, Any]]:
         results = []
         model = self.model(pd.DataFrame(self.x_data), self.combo_options, None, self.hyperparameters)
+        if self.pipeline_type == PipelineMode.TESTING and len(model.hyperparameters) != 1:
+            raise ValueError("The testing pipeline requires exactly one hyperparameter combination.")
         for param_set in model.hyperparameters:
             kde_params = self.preprocessing_params["kde"]
             if self.pipeline_type == PipelineMode.TESTING:
@@ -200,6 +203,7 @@ class ParameterSearch:
 
                 model.clf.set_params(**param_set)
                 roc_auc = model.train_testing(train_frame, pd.DataFrame(data.x_test), pd.Series(data.y_test))
+                self.trained_model = SklearnPipeline([("scaler", scaler), ("classifier", model.clf)])
 
                 feature_importances = model.train_info.get("feature_importances")
 

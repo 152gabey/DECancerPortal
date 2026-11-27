@@ -282,6 +282,7 @@ class RandomForest(Model):
 
         # Training
         estimator = self.clf.fit(x_data.values, y_data)
+        self.train_info["feature_importances"] = estimator.feature_importances_
         y_score = estimator.predict_proba(x_test.values)[:, 1]
 
         # Scoring

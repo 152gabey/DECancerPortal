@@ -45,7 +45,7 @@ sys.modules["sklearn.neighbors.base"] = sklearn.neighbors._base  # missingpy is 
 from missingpy import MissForest
 from sklearn.model_selection import GridSearchCV
 from sklearn.neighbors import KernelDensity
-from sklearn.preprocessing import OrdinalEncoder
+from src.static_encoders import get_race_encoder, get_sex_encoder
 
 
 @dataclass
@@ -220,13 +220,18 @@ class Data:
 
         categorical_features = [feat for feat in self.features.categorical_features if feat not in ["Ω score", "Age"]]
         x_floats = data_input[list(self.features.features) + ["Ω score", "Age"]].to_numpy()
+        
+        # Ordinally encoding categorial X values using static encoders
+        print("Ordinally encoding categorical input features (race, sex)...")
         x_cat = data_input[categorical_features].to_numpy()
-
-        # Ordinally encoding categorial X values
-        print("Ordinally encoding categorical input features (ethnicity, race)...")
-        x_cat_encoder = OrdinalEncoder(handle_unknown="error")
-        x_cat_encoder.fit(x_cat)
-        x_cat_ordinal = x_cat_encoder.transform(x_cat)
+        
+        race_encoder = get_race_encoder()
+        sex_encoder = get_sex_encoder()
+        
+        x_race_ordinal = race_encoder.transform(x_cat[:, [0]])
+        x_sex_ordinal = sex_encoder.transform(x_cat[:, [1]])
+        x_cat_ordinal = np.concatenate([x_race_ordinal, x_sex_ordinal], axis=1)
+        
         print("Done.\n")
 
         # Group all numerical columns for imputation.

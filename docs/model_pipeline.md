@@ -58,7 +58,7 @@ REFRESH_CACHE = False
 PIPELINE_FLAG = PipelineMode.TESTING
 RESULTS_PATH = "Results/test"
 VALIDATION_FLAG = ValidationMode.RECURSIVE_FEATURE_ELIMINATION
-BEST_PARAMS_USED = True
+BEST_PARAMS_USED = False
 ```
 
 ### Classification Modes
@@ -67,6 +67,11 @@ BEST_PARAMS_USED = True
 ### Filtering Strategies
 - **FilterMode.POST_T_TEST** - Statistical post-test filtering
 - **FilterMode.EVERY_PROTEIN** - Using all available proteins
+
+The default test run uses cancer vs. healthy, Random Forest, no KDE, the full
+model and every protein, with the same configured hyperparameters for each
+cancer type. Only the cancer type varies. Testing uses the selected filter;
+post-t-test filtering requires the corresponding feature file.
 
 ---
 
@@ -77,21 +82,41 @@ BEST_PARAMS_USED = True
 
 For each cancer type:
 ```
-Results/test/{CancerType}/
-  ├── cancer-healthy/
-  │   ├── proteinsOnly_all/
-  │   └── fullModel_all/
-  ├── cancer-otherCancers/
-  │   ├── proteinsOnly_all/
-  │   └── fullModel_all/
-  └── cancer-rest/
-      ├── proteinsOnly_all/
-      └── fullModel_all/
+Results/test/{CancerType}/cancer-healthy/fullModel_all/
+  ├── RandomForestTest.pkl
+  └── RandomForestModel.pkl
+Results/test/cancer-healthy/fullModel_all/RandomForest_all.json
 ```
 
 **Files Generated:**
-- `*Test*.pkl` - Serialized model objects from testing phase
-- Pickle files contain trained classifiers, predictions, and performance metrics
+- `*Test.pkl` contains predictions and performance metrics.
+  Important keys in `results[0]["results"]`:
+  - **`train_ids`** and **`test_ids`**: training and test sample IDs, stored
+    as column arrays.
+  - **`source_test_labels`**: ordinal-encoded tumor types for test samples.
+  - **`stage_test_labels`**: encoded cancer stages for test samples; `0`
+    denotes missing stage, and other values are the ordinal category index
+    plus one.
+  - **`test_results`**:
+    - **`y_truth`**: one-hot encoded test labels (healthy = 0, cancer = 1
+      for cancer-healthy classification).
+    - **`y_pred`**: predicted class probabilities in the same class order.
+    - **`auc`**: test ROC AUC.
+    - **`feature_importances`**: fitted Random Forest importances in input
+      feature order.
+
+  Test IDs, labels, and prediction rows share the same order. The tumor and
+  stage category mappings are stored in the pipeline cache.
+- `RandomForest_all.json` is an array containing the results for every cancer
+  type in the current run. Each entry has a `cancer_type` and the same result
+  fields as the pickle; arrays are represented as JSON arrays and KDE methods
+  by their values. Each run replaces this file rather than retaining results
+  for cancer types not included in the run.
+- `*Model.pkl` contains the fitted scaler and classifier as a scikit-learn
+  pipeline, trained on the training split used for the reported test results.
+  Supply the same ordered, already encoded and filtered features used by the
+  testing pipeline; data loading and categorical encoding are not included.
+  Only load pickle files from trusted sources.
 
 ---
 

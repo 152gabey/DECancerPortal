@@ -79,15 +79,16 @@ class ValidationMode(Enum):
 class CancerType(Enum):
     """The type of cancer."""
 
+    NORMAL = "Normal (cancer-free)"
     BREAST = "Breast"
     COLORECTUM = "Colorectum"
     ESOPHAGUS = "Esophagus"
     LIVER = "Liver"
     LUNG = "Lung"
     OVARY = "Ovary"
-    PANCANCER = "pancancer"
     PANCREAS = "Pancreas"
     STOMACH = "Stomach"
+    PANCANCER = "pancancer"
 
 
 class Classifier(Enum):
