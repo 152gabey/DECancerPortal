@@ -1,12 +1,11 @@
 """Application configuration loaded from environment variables."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import os
 
 from dotenv import load_dotenv
 from sklearn.ensemble import RandomForestClassifier
 
-from src._types import ModelEstimator
 import src.cancerseek.constants as cs
 from src.models.random_forest import RandomForest
 from src.parameters import Parameter
@@ -31,7 +30,7 @@ settings = Settings()
 @dataclass(frozen=True)
 class ModelSettings:
     model_path: str = os.getenv("MODEL_PATH", "Results/test")
-    cancer_types: list[cs.CancerType] = [
+    cancer_types: list[cs.CancerType] = field(default_factory=lambda: [
         cs.CancerType.BREAST,
         cs.CancerType.COLORECTUM,
         cs.CancerType.ESOPHAGUS,
@@ -41,13 +40,17 @@ class ModelSettings:
         cs.CancerType.PANCREAS,
         cs.CancerType.STOMACH,
         cs.CancerType.PANCANCER,
-    ]
+    ])
     classification_mode: cs.ClassificationMode = cs.ClassificationMode.CANCER_HEALTHY
     model_mode: cs.ModelMode = cs.ModelMode.FULL_MODEL
     filter_mode: cs.FilterMode = cs.FilterMode.EVERY_PROTEIN
     kde_method: cs.KDEMethod = cs.KDEMethod.NONE
-    model: type[ModelEstimator] = RandomForest
-    params: list[Parameter] = [Parameter(RandomForestClassifier, *el) for el in cs.Classifier.RF.value]
+    model: type[RandomForest] = RandomForest
+    params: list[Parameter] = field(
+        default_factory=lambda: [
+            Parameter(RandomForestClassifier, *el) for el in cs.Classifier.RF.value
+        ]
+    )
     model_version: str = "v1.0"
 
 model_settings = ModelSettings()
