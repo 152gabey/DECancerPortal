@@ -3,7 +3,7 @@ session_start();
 require __DIR__ . '/includes/db.php';
 
 // Roles that are allowed to sign in. Patients are not on this list.
-$allowedRoles = ['oncologist', 'researcher', 'admin']; /* check with group - are we giving admin access to webpage?*/
+$allowedRoles = ['oncologist', 'researcher', 'admin'];
 
 $error = false;
 
@@ -13,13 +13,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // 1. Look the username up in the Users table
     $db   = getDb();
-    $stmt = $db->prepare('SELECT User_ID, Username, FirstName, LastName, Role, Password_Hash, Is_Active FROM Users WHERE Username = ?');
+    $stmt = $db->prepare('SELECT User_ID, Username, FirstName, LastName, Role, Password_Hash FROM Users WHERE Username = ?');
     $stmt->execute([$username]);
     $user = $stmt->fetch();
 
-    // 2. Check: user exists, account is active, role is allowed, password matches
+    // 2. Check: user exists, role is allowed, password matches
     if ($user
-        && $user['Is_Active']
         && in_array($user['Role'], $allowedRoles, true)
         && password_verify($password, $user['Password_Hash'])) {
 
@@ -30,13 +29,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['name']     = $user['FirstName'] . ' ' . $user['LastName'];
         $_SESSION['role']     = $user['Role'];
 
-        $db->prepare('UPDATE Users SET Last_Login = NOW() WHERE User_ID = ?')->execute([$user['User_ID']]);
-
-        header('Location: whoami.php');
+        header('Location: index.php');
         exit;
     }
 
-    // Wrong username, wrong password, switched-off account and patients all get the same message
+    // Wrong username, wrong password and patients all get the same message
     $error = true;
 }
 ?>

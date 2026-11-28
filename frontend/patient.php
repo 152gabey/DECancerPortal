@@ -158,7 +158,7 @@ include __DIR__ . '/includes/header.php';
           </section>
 
           <section>
-            <div class="section-head"><h2>Samples</h2><span class="muted-text"><?= count($samples) ?> in total</span></div>
+            <div class="section-head"><h2>Samples</h2><span class="muted-text"><?= count($samples) ?> in total &middot; <a class="text-link" href="upload_sample.php?patient=<?= $id ?>">Upload sample file</a></span></div>
             <div class="table-wrap">
               <table>
                 <thead><tr><th>Sample</th><th>Collected</th><th>Type</th><th>Age</th><th>&Omega; score</th></tr></thead>
