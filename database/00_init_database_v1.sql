@@ -82,7 +82,7 @@ CREATE TABLE Users (
 -- ------------------------------------------------------------
 CREATE TABLE Samples (
   Sample_ID               INT AUTO_INCREMENT PRIMARY KEY,
-  Sample_Code             VARCHAR(30) NOT NULL,   -- 'Sample ID #'
+  Sample_Code             VARCHAR(30) NULL,       -- Optional external identifier
   Patient_ID              INT         NOT NULL,
   Uploaded_By             INT         NOT NULL,
   Collection_Date         DATE        NULL,

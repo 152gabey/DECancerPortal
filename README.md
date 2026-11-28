@@ -129,8 +129,8 @@ Open `http://127.0.0.1:8080` in your browser. Configure your server to proxy
 `/api` requests to the FastAPI service at `http://127.0.0.1:8000`, or access
 both from the same origin.
 
-For the PHP sample-prediction page, use PHP's built-in server instead of the
-static Python server so that `test.php` is executed. See
+For the PHP portal and sample-prediction page, use PHP's built-in server instead
+of the static Python server so PHP pages such as `predict.php` are executed. See
 [docs/model_integration.md](docs/model_integration.md) for the PHP-to-FastAPI
 request flow, model inputs, database writes, and local run instructions.
 

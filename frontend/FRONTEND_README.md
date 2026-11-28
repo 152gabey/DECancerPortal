@@ -37,7 +37,6 @@ You need PHP 8 and MySQL installed (PHP's MySQL driver, `pdo_mysql`, comes with 
 |---|---|---|---|
 | `researcher1` | Researcher | `TestPassword123` | Sees everything, including **Trends** and the **Top influence** card on the dashboard |
 | `oncologist1` | Oncologist | `TestPassword123` | No **Trends** link and no **Top influence** card |
-| `patient1` | Patient | (any) | **Refused.** Patients can't sign in, so you should see "Incorrect username or password" |
 
 These are throwaway passwords for local test copies of the database. Don't reuse a real password anywhere in this project.
 
@@ -48,9 +47,9 @@ These are throwaway passwords for local test copies of the database. Don't reuse
 | **Login** (`login.php`) | Checks the username and password against the `Users` table. Wrong details and disallowed roles get the same error. | Real |
 | **Dashboard** (`index.php`) | Four count tiles, a bar chart of one protein's average level per cancer type (pick a protein and press *Show*), recent predictions, prediction results, recent patients, and (researchers only) top influence. | Real. Prediction tables will say "No predictions have been run yet" until predictions exist. |
 | **Patients** (`patients.php`) | Search by name or ID, filter by cancer type, stage and sex, 15 per page. | Real |
-| **Patient detail** (`patient.php?id=...`) | Profile, latest diagnosis, latest prediction, all samples (click a sample code to switch), and all 39 biomarkers compared with the cancer-free average. | Real |
+| **Patient detail** (`patient.php?id=...`) | Profile, latest diagnosis, latest prediction, all samples (click a sample ID to switch), and all 39 biomarkers compared with the cancer-free average. | Real |
 | **Add a patient** (`add_patient.php`) | Creates a new patient record, then opens their page. Try leaving fields empty to see the checks. | Real. It writes to your local database. |
-| **Predict** (`predict.php`) | The 39 biomarker inputs, patient details, a file upload, a results panel and feedback buttons. | **Design only.** The buttons don't do anything yet and the results panel shows example numbers. |
+| **Predict** (`predict.php`) | Enter or import one sample's 39 biomarker measurements for an existing patient and save it, optionally providing an external sample code. The generated `Sample_ID` is used to run the model. Results and prediction feedback appear beside the saved-sample form. | Real. Requires the FastAPI service and configured model files. |
 | **Biomarkers** | Placeholder card. | Placeholder |
 | **Trends** (researchers only) | Placeholder card. Oncologists get "You do not have access to this page." | Placeholder |
 | **Model performance** | Placeholder card, waiting for evaluation charts. | Placeholder |
@@ -66,7 +65,7 @@ These are throwaway passwords for local test copies of the database. Don't reuse
 
 ## 6. Known limitations
 
-- Predict is not connected to the model yet.
+- CSV import requires exactly one sample row and one column per biomarker, using the downloadable template's headers. Each header includes the protein's unit; enter numeric values in those units. The same measurements can instead be entered in the form.
 - The Biomarkers, Trends and Model performance pages are placeholders.
 - There is no JavaScript or AJAX yet. The dashboard dropdown reloads the page.
-- There's no way to add a diagnosis or a sample from the website yet.
+- There is no way to add a diagnosis from the website yet.

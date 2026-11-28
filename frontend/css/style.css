@@ -175,6 +175,9 @@ td { padding: .8rem .5rem; border-top: 1px solid var(--line); white-space: nowra
 .muted-text { color: var(--muted); font-size: .9rem; }
 .card-head { display: flex; justify-content: space-between; align-items: center; gap: .75rem; margin-bottom: 1rem; }
 .card-head h2 { margin: 0; }
+.sample-card-head { flex-wrap: wrap; }
+.sample-identifiers { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .4rem; }
+.sample-id-link { font-weight: 700; text-decoration: underline; }
 .badge { background: var(--accent-soft); color: var(--accent); font-size: .75rem; font-weight: 600; padding: .2rem .65rem; border-radius: 999px; white-space: nowrap; }
 
 /* Mutation map (lollipop plot) */
@@ -215,6 +218,7 @@ select, .field input[type="text"], .field input[type="number"], .field select, .
 
 /* Predict page */
 .predict { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 1.25rem; align-items: start; }
+.predict-side { display: grid; gap: 1.25rem; align-content: start; min-width: 0; }
 .form { display: grid; gap: 1.25rem; }
 .form-title { margin-top: .25rem; }
 .group-box { border: 0; padding: 0; min-width: 0; }
@@ -224,13 +228,15 @@ select, .field input[type="text"], .field input[type="number"], .field select, .
 .input-unit { display: flex; align-items: center; gap: .5rem; }
 .input-unit span { font-size: .75rem; color: var(--muted); min-width: 34px; }
 .group { background: #fff; border-radius: 18px; padding: .9rem 1.1rem; }
+.group + .group { margin-top: .75rem; }
 .group summary { cursor: pointer; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
 .group summary small { color: var(--muted); font-weight: 400; }
 .group .fields { margin-top: 1rem; }
-.upload { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; background: var(--accent-soft); border-radius: 18px; padding: 1rem 1.2rem; font-size: .9rem; }
+.upload { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; background: var(--accent-soft); border-radius: 18px; padding: 1rem 1.2rem; margin-top: .5rem; font-size: .9rem; }
 .upload small { display: block; color: var(--muted); }
 .upload input[type="file"] { font: inherit; font-size: .85rem; max-width: 100%; }
 .form-actions { display: flex; gap: .75rem; }
+.predict .form-actions { margin-top: .5rem; }
 button.button { border: 0; cursor: pointer; font-family: inherit; }
 .button.ghost { background: #fff; color: var(--ink); border: 1px solid var(--line); }
 .button.ghost:hover { background: var(--ink); color: #fff; }
@@ -269,7 +275,8 @@ main, .main, .col { grid-template-columns: minmax(0, 1fr); }   /* let the single
 .result-top .big { display: block; font-size: 1.8rem; line-height: 1.2; letter-spacing: -0.02em; }
 .result-top .pill { margin-top: .35rem; }
 .note { font-size: .8rem; color: var(--muted); margin-top: .5rem; }
-.feedback { margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--line); display: grid; gap: .5rem; }
+.feedback-panel { margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
+.feedback { display: grid; gap: .5rem; }
 .feedback h3 { margin: 0 0 .25rem; }
 .feedback label { font-size: .8rem; font-weight: 600; }
 .feedback select, .feedback textarea { font: inherit; font-size: .9rem; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: .55rem .8rem; width: 100%; resize: vertical; }

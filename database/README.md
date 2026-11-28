@@ -106,6 +106,9 @@ Drops `Users.Patient_ID` and removes `patient` from the `Users.Role` enum. Run o
 ### migrations/08_remove_user_activity_fields.sql
 Drops the unused account activity fields. Run once on an existing database that still has them.
 
+### migrations/09_make_sample_code_optional.sql
+Allows `Samples.Sample_Code` to be `NULL` when no external sample code is available. The generated `Sample_ID` remains the identifier used to run predictions; existing sample codes and the unique constraint are preserved. Run once on an existing database after backing it up.
+
 ## Setup Instructions
 
 ### Using SQLTools (Recommended in VS Code)

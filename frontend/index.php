@@ -123,7 +123,7 @@ function biomarkerChart(array $levels, ?float $normalAvg, string $unit): string
 
 // ---- 3. Recent predictions ----
 $recentPredictions = $db->query('SELECT pr.Prediction_ID, pr.Date, pr.Pancancer_Probability, pr.Prediction_Result,
-        s.Sample_Code, s.Patient_ID,
+        s.Sample_ID, s.Sample_Code, s.Patient_ID,
         (SELECT c.Cancer_Name FROM Prediction_Scores ps JOIN Cancer_Types c ON c.Cancer_ID = ps.Cancer_ID
          WHERE ps.Prediction_ID = pr.Prediction_ID ORDER BY ps.Probability DESC LIMIT 1) AS Top_Organ
     FROM Predictions pr
@@ -199,21 +199,22 @@ include __DIR__ . '/includes/header.php';
       <div class="table-wrap">
         <table>
           <thead>
-            <tr><th>Sample</th><th>Cancer probability</th><th>Result</th><th>Top organ</th><th>When</th><th><span class="sr-only">Open</span></th></tr>
+            <tr><th>Sample ID</th><th>Sample code</th><th>Cancer probability</th><th>Result</th><th>Top organ</th><th>When</th><th><span class="sr-only">Open</span></th></tr>
           </thead>
           <tbody>
             <?php if (!$recentPredictions): ?>
-              <tr><td colspan="6">No predictions have been run yet.</td></tr>
+              <tr><td colspan="7">No predictions have been run yet.</td></tr>
             <?php endif; ?>
             <?php foreach ($recentPredictions as $p): ?>
               <?php $isCancer = $p['Prediction_Result'] === 'cancer'; ?>
               <tr>
-                <td><strong><?= h($p['Sample_Code']) ?></strong></td>
+                <td><?= (int) $p['Sample_ID'] ?></td>
+                <td><strong><?= h($p['Sample_Code'] ?? '–') ?></strong></td>
                 <td><span class="meter"><i style="width: <?= round($p['Pancancer_Probability'] * 100) ?>%"></i></span><?= number_format((float) $p['Pancancer_Probability'], 2) ?></td>
                 <td><span class="pill <?= $isCancer ? 'high' : 'low' ?>"><?= $isCancer ? 'Cancer' : 'Cancer-free' ?></span></td>
                 <td><?= h($p['Top_Organ'] ?: '–') ?></td>
                 <td><?= h(date('j M, H:i', strtotime($p['Date']))) ?></td>
-                <td><a class="round-btn" href="patient.php?id=<?= (int) $p['Patient_ID'] ?>" aria-label="Open patient for sample <?= h($p['Sample_Code']) ?>"><?= icon('arrow') ?></a></td>
+                <td><a class="round-btn" href="patient.php?id=<?= (int) $p['Patient_ID'] ?>&amp;sample=<?= (int) $p['Sample_ID'] ?>" aria-label="Open patient details for sample ID <?= (int) $p['Sample_ID'] ?>"><?= icon('arrow') ?></a></td>
               </tr>
             <?php endforeach; ?>
           </tbody>

@@ -59,7 +59,7 @@ foreach ($samples as $s) {
 
 // 4. Latest prediction on any of their samples
 $stmt = $db->prepare('SELECT pr.Prediction_ID, pr.Date, pr.Pancancer_Probability, pr.Prediction_Result, pr.Model_Version,
-        s.Sample_Code
+        s.Sample_ID, s.Sample_Code
     FROM Predictions pr
     JOIN Samples s ON s.Sample_ID = pr.Sample_ID
     WHERE s.Patient_ID = ?
@@ -69,11 +69,11 @@ $prediction = $stmt->fetch();
 
 $topOrgan = null;
 if ($prediction) {
-    $stmt = $db->prepare('SELECT ct.Cancer_Name FROM Prediction_Scores ps
+    $stmt = $db->prepare('SELECT ct.Cancer_Name, ps.Probability FROM Prediction_Scores ps
         JOIN Cancer_Types ct ON ct.Cancer_ID = ps.Cancer_ID
         WHERE ps.Prediction_ID = ? ORDER BY ps.Probability DESC LIMIT 1');
     $stmt->execute([$prediction['Prediction_ID']]);
-    $topOrgan = $stmt->fetchColumn();
+    $topOrgan = $stmt->fetch();
 }
 
 // 5. Biomarker values for the chosen sample, next to the average of cancer-free patients
@@ -143,13 +143,22 @@ include __DIR__ . '/includes/header.php';
             <?php if ($prediction): ?>
               <div class="result-top">
                 <div>
-                  <small>Chance of cancer</small>
+                  <small>Pancancer probability</small>
                   <strong class="big"><?= number_format((float) $prediction['Pancancer_Probability'], 2) ?></strong>
                   <span class="pill <?= $prediction['Prediction_Result'] === 'cancer' ? 'high' : 'low' ?>"><?= $prediction['Prediction_Result'] === 'cancer' ? 'Cancer' : 'Cancer-free' ?></span>
                 </div>
-                <div><small>Top organ</small><strong><?= h($topOrgan ?: '–') ?></strong></div>
+                <div>
+                  <small>Highest cancer-specific score</small>
+                  <strong><?= h($topOrgan['Cancer_Name'] ?? '–') ?></strong>
+                  <?php if ($topOrgan): ?><span><?= number_format((float) $topOrgan['Probability'] * 100, 1) ?>%</span><?php endif; ?>
+                </div>
               </div>
-              <p class="meta">Sample <?= h($prediction['Sample_Code']) ?> &middot; <?= h(date('j M Y, H:i', strtotime($prediction['Date']))) ?> &middot; <?= h($prediction['Model_Version']) ?></p>
+              <dl class="dl">
+                <div><dt>Sample ID</dt><dd><?= (int) $prediction['Sample_ID'] ?></dd></div>
+                <div><dt>Sample code</dt><dd><?= h($prediction['Sample_Code'] ?? '–') ?></dd></div>
+                <div><dt>Predicted</dt><dd><?= h(date('j M Y, H:i', strtotime($prediction['Date']))) ?></dd></div>
+                <div><dt>Model version</dt><dd><?= h($prediction['Model_Version']) ?></dd></div>
+              </dl>
             <?php else: ?>
               <p class="muted-text">No prediction has been run for this patient yet.</p>
             <?php endif; ?>
@@ -159,15 +168,16 @@ include __DIR__ . '/includes/header.php';
             <div class="section-head"><h2>Samples</h2><span class="muted-text"><?= count($samples) ?> in total</span></div>
             <div class="table-wrap">
               <table>
-                <thead><tr><th>Sample</th><th>Collected</th><th>Type</th><th>Age</th><th>&Omega; score</th></tr></thead>
+                <thead><tr><th>Sample ID</th><th>Sample code</th><th>Collected</th><th>Type</th><th>Age</th><th>&Omega; score</th></tr></thead>
                 <tbody>
-                  <?php if (!$samples): ?><tr><td colspan="5">No samples for this patient.</td></tr><?php endif; ?>
+                  <?php if (!$samples): ?><tr><td colspan="6">No samples for this patient.</td></tr><?php endif; ?>
                   <?php foreach ($samples as $s): ?>
                     <tr>
                       <td>
-                        <a href="patient.php?id=<?= $id ?>&amp;sample=<?= (int) $s['Sample_ID'] ?>"><strong><?= h($s['Sample_Code']) ?></strong></a>
+                        <a class="sample-id-link" href="patient.php?id=<?= $id ?>&amp;sample=<?= (int) $s['Sample_ID'] ?>"><strong><?= (int) $s['Sample_ID'] ?></strong></a><br>
                         <?= $current && $s['Sample_ID'] == $current['Sample_ID'] ? '<span class="badge">Shown below</span>' : '' ?>
                       </td>
+                      <td><?= h($s['Sample_Code'] ?? '–') ?></td>
                       <td><?= $s['Collection_Date'] ? h(date('j M Y', strtotime($s['Collection_Date']))) : '–' ?></td>
                       <td><?= h($s['Sample_Type'] ?: '–') ?></td>
                       <td><?= h($s['Age_At_Collection']) ?></td>
@@ -181,7 +191,13 @@ include __DIR__ . '/includes/header.php';
 
           <?php if ($current): ?>
           <section class="card">
-            <div class="card-head"><h2>Biomarker values</h2><span class="badge">Sample <?= h($current['Sample_Code']) ?></span></div>
+            <div class="card-head sample-card-head">
+              <h2>Biomarker values</h2>
+              <div class="sample-identifiers">
+                <span class="badge">Sample ID: <?= (int) $current['Sample_ID'] ?></span>
+                <span class="badge">Sample code: <?= h($current['Sample_Code'] ?? '–') ?></span>
+              </div>
+            </div>
             <p class="muted-text small">All <?= count($biomarkers) ?> proteins, compared with the average of cancer-free patients. &ldquo;Higher&rdquo; means more than 1.5&times; the cancer-free average, &ldquo;Lower&rdquo; less than half.</p>
             <div class="table-wrap">
               <table>

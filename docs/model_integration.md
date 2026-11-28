@@ -9,12 +9,15 @@ stored and displayed.
 ```mermaid
 sequenceDiagram
     actor User
-    participant PHP as PHP page (test.php)
+    participant PHP as PHP portal (predict.php)
     participant API as FastAPI
     participant DB as MySQL
     participant Models as Trained model files
 
-    User->>PHP: Submit numeric Sample_ID
+    User->>PHP: Select patient, enter sample details, upload biomarker CSV
+    PHP->>DB: Save sample and 39 biomarker measurements
+    DB-->>PHP: Return Sample_ID and prefill prediction form
+    User->>PHP: Submit saved Sample_ID for prediction
     PHP->>API: POST /api/predict/sample/{sample_id}
     API->>DB: Read sample owner, biomarkers, and demographics
     DB-->>API: Return sample data
@@ -31,8 +34,13 @@ models, saves the prediction, and returns JSON for PHP to display.
 
 ## PHP page
 
-`frontend/test.php` displays a form for a positive integer `Sample_ID`. On
-submission it validates the value and calls the API with PHP cURL:
+`frontend/predict.php` accepts an existing `Patient_ID`, sample metadata, and
+the 39 biomarker measurements. Measurements can be entered in the form or
+provided as a CSV with one header row containing each biomarker name (available
+from the page's downloadable template) and exactly one row of non-negative
+numeric values. The page saves the sample and its measurements in one database
+transaction and displays the generated `Sample_ID`. The user then submits that
+ID in the **Predict an already saved sample** form. PHP calls the API with it:
 
 ```http
 POST http://127.0.0.1:8000/api/predict/sample/1
@@ -41,7 +49,12 @@ POST http://127.0.0.1:8000/api/predict/sample/1
 The ID is part of the URL path; the request does not need a JSON body. PHP
 decodes the JSON response and displays the highest cancer-specific score, the
 binary result, the pancancer score, and individual cancer scores. Non-2xx API
-responses are shown as an error on the page.
+responses are shown beside the saved-sample form, so the user can retry without
+re-uploading.
+
+The result card includes a feedback form. Each signed-in user can submit one
+response per prediction; the optional suggested cancer and comment are stored
+in `Prediction_Feedback`.
 
 The API address defaults to `http://127.0.0.1:8000`. To override it, set
 `PREDICTION_API_URL` in the environment of the PHP server process.
@@ -72,10 +85,10 @@ terminal and returns a generic database error to the client.
 
 ## Feature preparation and model calls
 
-`run_prediction` first reads the sample's `Uploaded_By` user ID. It then loads
-the 39 biomarker measurements ordered by `Biomarker_ID`, plus the patient's
-race, sex, omega score, and age. The resulting 43 values are arranged in the
-same order used by training:
+`run_prediction` first verifies that the requested `Sample_ID` exists.
+The service then loads the 39 biomarker measurements ordered by `Biomarker_ID`,
+plus the patient's race, sex, omega score, and age. The resulting 43 values are
+arranged in the same order used by training:
 
 1. Biomarkers 1 through 39
 2. Omega score
@@ -131,8 +144,10 @@ Start PHP's built-in web server (PHP cURL support must be enabled):
 php -S 127.0.0.1:8080 -t frontend
 ```
 
-Open `http://127.0.0.1:8080/test.php`, enter a valid database `Sample_ID`, and
-submit the form. A direct API check can be made with:
+Open `http://127.0.0.1:8080/predict.php`, sign in, select an existing patient,
+fill in the sample details, and upload the biomarker CSV. The old
+`test.php` address redirects to this authenticated portal page. A direct API
+check can be made with:
 
 ```sh
 curl -X POST http://127.0.0.1:8000/api/predict/sample/1
