@@ -49,7 +49,7 @@ These are throwaway passwords for local test copies of the database. Don't reuse
 | **Predict** (`predict.php`) | Enter or import one sample's 39 biomarker measurements for an existing patient and save it, optionally providing an external sample code. The generated `Sample_ID` is used to run the model. Results, a link to the patient's details for that sample, and prediction feedback appear beside the saved-sample form. CSV template headers include units. | Real. Requires the FastAPI service and configured model files. |
 | **Biomarkers** (`biomarkers.php`) | Search the 39 proteins and compare average levels by diagnosis. Purple shading marks cancer averages more than 1.5 times the cancer-free average; select a protein to chart it on the dashboard. | Real |
 | **Trends** (`trends.php`) (researchers and admins) | Reserved for trends over time and between cancer types. Oncologists do not have access. | Placeholder |
-| **Model performance** (`model.php`) | Reserved for model evaluation metrics and charts. | Placeholder |
+| **Model performance** (`model.php`) | Select a cancer model to view its test-set ROC curve, confusion matrix, AUC, precision, recall, accuracy and F1 score, with a comparison table for all models. Training-set metrics are not shown. | Precomputed test results and figures |
 | **About** (`about.php`) | What a liquid biopsy is, what the model uses, how to use the portal and how to read a result. | Text |
 
 ## 4. Quick checks worth doing
@@ -63,6 +63,6 @@ These are throwaway passwords for local test copies of the database. Don't reuse
 ## 6. Known limitations
 
 - CSV import requires exactly one sample row and one column per biomarker, using the downloadable template's headers. Each header includes the protein's unit; enter numeric values in those units. The same measurements can instead be entered in the form.
-- The Biomarkers, Trends and Model performance pages are placeholders.
+- Trends is a placeholder. Model performance shows precomputed test-set results; training-set metrics are not available on the page.
 - There is no JavaScript or AJAX yet. The dashboard dropdown reloads the page.
 - There is no way to add a diagnosis from the website yet.
