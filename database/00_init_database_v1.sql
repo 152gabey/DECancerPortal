@@ -1,6 +1,6 @@
 -- ============================================================
 -- Cancer Type Prediction System - database schema (MySQL 8.0.16+)
--- 10 tables, InnoDB, utf8mb4
+-- 12 tables, InnoDB, utf8mb4
 -- All patient names, photos, dates of birth and countries are synthetic.
 -- ============================================================
 
@@ -11,18 +11,40 @@ CREATE DATABASE decancer_portal
 USE decancer_portal;
 
 -- ------------------------------------------------------------
+-- 1a. Sex_Types (lookup table)
+-- ------------------------------------------------------------
+CREATE TABLE Sex_Types (
+  Sex_Type_ID INT AUTO_INCREMENT PRIMARY KEY,
+  Sex_Name    VARCHAR(50) NOT NULL,
+  CONSTRAINT uq_sex_name UNIQUE (Sex_Name)
+) ENGINE=InnoDB;
+
+-- ------------------------------------------------------------
+-- 1b. Race_Types (lookup table)
+-- ------------------------------------------------------------
+CREATE TABLE Race_Types (
+  Race_Type_ID INT AUTO_INCREMENT PRIMARY KEY,
+  Race_Name    VARCHAR(100) NOT NULL,
+  CONSTRAINT uq_race_name UNIQUE (Race_Name)
+) ENGINE=InnoDB;
+
+-- ------------------------------------------------------------
 -- 1. Patients
 -- ------------------------------------------------------------
 CREATE TABLE Patients (
-  Patient_ID    INT AUTO_INCREMENT PRIMARY KEY,
-  FirstName     VARCHAR(50)  NOT NULL,
-  LastName      VARCHAR(50)  NOT NULL,
-  Date_of_Birth DATE         NOT NULL,
-  Sex           ENUM('Female','Male') NOT NULL,
-  Race          VARCHAR(50)  NOT NULL,
-  Country       VARCHAR(60)  NULL,
-  Photo         VARCHAR(255) NULL,            -- file path, not the image itself
-  Created_Date  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
+  Patient_ID     INT AUTO_INCREMENT PRIMARY KEY,
+  FirstName      VARCHAR(50)  NOT NULL,
+  LastName       VARCHAR(50)  NOT NULL,
+  Date_of_Birth  DATE         NOT NULL,
+  Sex_Type_ID    INT          NOT NULL,
+  Race_Type_ID   INT          NOT NULL,
+  Country        VARCHAR(60)  NULL,
+  Photo          VARCHAR(255) NULL,            -- file path, not the image itself
+  Created_Date   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_patients_sex FOREIGN KEY (Sex_Type_ID)
+    REFERENCES Sex_Types(Sex_Type_ID) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT fk_patients_race FOREIGN KEY (Race_Type_ID)
+    REFERENCES Race_Types(Race_Type_ID) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------------
