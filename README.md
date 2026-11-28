@@ -134,6 +134,18 @@ static Python server so that `test.php` is executed. See
 [docs/model_integration.md](docs/model_integration.md) for the PHP-to-FastAPI
 request flow, model inputs, database writes, and local run instructions.
 
+### Test accounts
+
+After importing `01_data_import_v1.sql`, these demo accounts are ready to use:
+
+| Username | Role | Password |
+|---|---|---|
+| `researcher1` | Researcher | `TestPassword123` |
+| `oncologist1` | Oncologist | `TestPassword123` |
+
+These credentials are for local demonstration only. Do not reuse them or expose
+the seeded database on a public network in a production environment.
+
 ### 6. Generate predictions using the CLI tool (Optional)
 
 The standalone prediction tool enables batch processing and automated scheduling:

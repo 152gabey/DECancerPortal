@@ -1885,8 +1885,8 @@ INSERT INTO Patients (Patient_ID, FirstName, LastName, Date_of_Birth, Sex_Type_I
 
 
 INSERT INTO Users (User_ID, Username, Email, Password_Hash, FirstName, LastName, Role, Speciality) VALUES
-  (2, 'researcher1', 'researcher1@decancer.demo', '$2y$10$vVQFKNSvLqDNk.xfLW0IPuqXaF37Gv2dnOndXc/VQrmsqDPf65rca', 'Riley', 'Researcher', 'researcher', 'Cancer genomics'),
-  (3, 'oncologist1', 'oncologist1@decancer.demo', '$2y$10$11bOk6kejERZI2/1cm3Wf.UV7q2hhdMc6Ez6LEC0AA4zcrJt3qWfq', 'Olivia', 'Oncologist', 'oncologist', 'Medical oncology');
+  (2, 'researcher1', 'researcher1@decancer.demo', '$2y$12$wZ1Xvm0uXU3Y0p2lnV/pqu.l8ZnqQb5h062CfXs9GtS/5K.G9LEFi', 'Riley', 'Researcher', 'researcher', 'Cancer genomics'),
+  (3, 'oncologist1', 'oncologist1@decancer.demo', '$2y$12$G83//FCTRhQlEUI.77Ry4edZZivngbhG.Hdnhq61i6K3YFrHYu6RW', 'Olivia', 'Oncologist', 'oncologist', 'Medical oncology');
   
 INSERT INTO Samples (Sample_ID, Sample_Code, Patient_ID, Uploaded_By, Collection_Date, Sample_Type, Age_At_Collection, Omega_Score, Mutation_Gene, Mutation_Type, Protein_Change, Coding_Change, Genomic_Change, Chromosome, Mutant_Allele_Frequency) VALUES
   (1, 'CRC 455 PLS 1', 1, 2, '2015-08-17', 'Plasma', 60, '2.96', 'TP53', 'Missense', 'p.K120E', 'c.358A>G', NULL, '17', '0.27'),
