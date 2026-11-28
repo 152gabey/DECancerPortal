@@ -84,6 +84,13 @@ one-based IDs in `Sex_Types` and `Race_Types`, and inserts patients using
 2. Verify data integrity with test queries
 3. Optionally drop old Sex and Race columns after confirming migration success
 
+### migrations/02_split_sample_mutation_details.sql
+**Purpose:** Adds `Protein_Change`, `Coding_Change`, and `Genomic_Change` to `Samples` and backfills them from the old `Mutation_Detail` values. It preserves the legacy columns during this first migration phase so the copied values can be reviewed before they are dropped in a follow-up migration.
+
+**Run:** Once, on a database that still has the previous `Samples` schema. Back up the database first, then verify the final review query returns no rows.
+
+After that verification, run `migrations/03_drop_legacy_mutation_columns.sql` to remove `Mutation_Detail`, `Position`, and their old index.
+
 ## Setup Instructions
 
 ### Using SQLTools (Recommended in VS Code)

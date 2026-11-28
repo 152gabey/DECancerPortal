@@ -204,7 +204,8 @@ WHERE p.Patient_ID = 1;
 -- ------------------------------------------------------------
 -- 10a. Filter by gene: patients with a KRAS mutation (first 10 shown)
 -- ------------------------------------------------------------
-SELECT p.Patient_ID, p.FirstName, p.LastName, s.Mutation_Gene, s.Mutation_Detail, s.Chromosome
+SELECT p.Patient_ID, p.FirstName, p.LastName, s.Mutation_Gene,
+       s.Protein_Change, s.Coding_Change, s.Genomic_Change, s.Chromosome
 FROM Samples s
 JOIN Patients p ON p.Patient_ID = s.Patient_ID
 WHERE s.Mutation_Gene = 'KRAS'
@@ -215,10 +216,10 @@ LIMIT 10;
 -- ------------------------------------------------------------
 -- 10b. Patients with the same mutation (TP53 p.R248Q)
 -- ------------------------------------------------------------
-SELECT p.Patient_ID, p.FirstName, p.LastName, s.Mutation_Detail
+SELECT p.Patient_ID, p.FirstName, p.LastName, s.Protein_Change, s.Coding_Change
 FROM Samples s
 JOIN Patients p ON p.Patient_ID = s.Patient_ID
-WHERE s.Mutation_Gene = 'TP53' AND s.Mutation_Detail LIKE 'p.R248Q%'
+WHERE s.Mutation_Gene = 'TP53' AND s.Protein_Change = 'p.R248Q'
 ORDER BY p.Patient_ID
 LIMIT 10;
 -- Expected: 15 matching rows in total (first 10 shown)
@@ -233,11 +234,11 @@ WHERE Chromosome = '17';
 --   (1315)
 
 -- ------------------------------------------------------------
--- 10d. Filter by position (only splice-site rows have a position)
+-- 10d. Count records with genomic HGVS notation (splice-site variants)
 -- ------------------------------------------------------------
-SELECT COUNT(*) AS samples_with_position
+SELECT COUNT(*) AS samples_with_genomic_change
 FROM Samples
-WHERE Position IS NOT NULL;
+WHERE Genomic_Change IS NOT NULL;
 -- Expected (1 row):
 --   (40)
 

@@ -2,8 +2,11 @@
 -- Insert predictions into the database without python usage.
 -- Implements prediction views for portal
 -- ============================================================
-DELETE FROM Predictions;
+USE decancer_portal;
+
+-- This import replaces all existing prediction records and scores.
 DELETE FROM Prediction_Scores;
+DELETE FROM Predictions;
 
 INSERT INTO Predictions (Prediction_ID, Sample_ID, User_ID, Date, Pancancer_Probability, Prediction_Result, Missing_Cancer_Score, Highest_Protein_Influence, Highest_Biomarker_ID, Model_Version) VALUES
 (4905, 1282, 1, '2026-11-26 18:45:48', 0.10333333333333333, 'cancer-free', NULL, 0.17972305437420547, 3, 'v1.0'),

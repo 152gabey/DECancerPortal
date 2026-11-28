@@ -97,10 +97,11 @@ CREATE TABLE Samples (
   Age_At_Collection       INT         NOT NULL,   -- model input: Age
   Omega_Score             DOUBLE      NOT NULL,   -- model input: Ω score
   Mutation_Gene           VARCHAR(30) NULL,
-  Mutation_Detail          VARCHAR(100) NULL, -- original text, e.g. 'p.R248Q, c.743G>A'
   Mutation_Type           VARCHAR(50) NULL,
+  Protein_Change          VARCHAR(50) NULL,
+  Coding_Change           VARCHAR(50) NULL,
+  Genomic_Change          VARCHAR(100) NULL,
   Chromosome              VARCHAR(5)  NULL,
-  Position                BIGINT      NULL,
   Mutant_Allele_Frequency DOUBLE      NULL,       -- percent (0-100), as in CancerSEEK
   CONSTRAINT uq_samples_code     UNIQUE (Sample_Code),
   CONSTRAINT fk_samples_patient  FOREIGN KEY (Patient_ID)
@@ -110,8 +111,7 @@ CREATE TABLE Samples (
   CONSTRAINT chk_samples_age     CHECK (Age_At_Collection BETWEEN 0 AND 120),
   CONSTRAINT chk_samples_maf     CHECK (Mutant_Allele_Frequency IS NULL
                                         OR Mutant_Allele_Frequency BETWEEN 0 AND 100),
-  INDEX idx_samples_mut_gene (Mutation_Gene),
-  INDEX idx_samples_mut_pos  (Chromosome, Position)
+  INDEX idx_samples_mut_gene (Mutation_Gene)
 ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------------
