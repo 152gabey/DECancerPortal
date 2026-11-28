@@ -123,12 +123,11 @@ function biomarkerChart(array $levels, ?float $normalAvg, string $unit): string
 
 // ---- 3. Recent predictions ----
 $recentPredictions = $db->query('SELECT pr.Prediction_ID, pr.Date, pr.Pancancer_Probability, pr.Prediction_Result,
-        s.Sample_Code, s.Patient_ID, u.FirstName, u.LastName,
+        s.Sample_ID, s.Sample_Code, s.Patient_ID,
         (SELECT c.Cancer_Name FROM Prediction_Scores ps JOIN Cancer_Types c ON c.Cancer_ID = ps.Cancer_ID
          WHERE ps.Prediction_ID = pr.Prediction_ID ORDER BY ps.Probability DESC LIMIT 1) AS Top_Organ
     FROM Predictions pr
     JOIN Samples s ON s.Sample_ID = pr.Sample_ID
-    JOIN Users u ON u.User_ID = pr.User_ID
     ORDER BY pr.Date DESC, pr.Prediction_ID DESC LIMIT 5')->fetchAll();
 
 // ---- 4. Right-hand cards ----
@@ -200,7 +199,7 @@ include __DIR__ . '/includes/header.php';
       <div class="table-wrap">
         <table>
           <thead>
-            <tr><th>Sample</th><th>Cancer probability</th><th>Result</th><th>Top organ</th><th>Run by</th><th>When</th><th><span class="sr-only">Open</span></th></tr>
+            <tr><th>Sample ID</th><th>Sample code</th><th>Cancer probability</th><th>Result</th><th>Top organ</th><th>When</th><th><span class="sr-only">Open</span></th></tr>
           </thead>
           <tbody>
             <?php if (!$recentPredictions): ?>
@@ -209,13 +208,13 @@ include __DIR__ . '/includes/header.php';
             <?php foreach ($recentPredictions as $p): ?>
               <?php $isCancer = $p['Prediction_Result'] === 'cancer'; ?>
               <tr>
-                <td><strong><?= h($p['Sample_Code']) ?></strong></td>
+                <td><?= (int) $p['Sample_ID'] ?></td>
+                <td><strong><?= h($p['Sample_Code'] ?? '–') ?></strong></td>
                 <td><span class="meter"><i style="width: <?= round($p['Pancancer_Probability'] * 100) ?>%"></i></span><?= number_format((float) $p['Pancancer_Probability'], 2) ?></td>
                 <td><span class="pill <?= $isCancer ? 'high' : 'low' ?>"><?= $isCancer ? 'Cancer' : 'Cancer-free' ?></span></td>
                 <td><?= h($p['Top_Organ'] ?: '–') ?></td>
-                <td><?= h($p['FirstName'] . ' ' . $p['LastName']) ?></td>
                 <td><?= h(date('j M, H:i', strtotime($p['Date']))) ?></td>
-                <td><a class="round-btn" href="patient.php?id=<?= (int) $p['Patient_ID'] ?>" aria-label="Open patient for sample <?= h($p['Sample_Code']) ?>"><?= icon('arrow') ?></a></td>
+                <td><a class="round-btn" href="patient.php?id=<?= (int) $p['Patient_ID'] ?>&amp;sample=<?= (int) $p['Sample_ID'] ?>" aria-label="Open patient details for sample ID <?= (int) $p['Sample_ID'] ?>"><?= icon('arrow') ?></a></td>
               </tr>
             <?php endforeach; ?>
           </tbody>

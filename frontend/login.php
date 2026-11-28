@@ -17,7 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt->execute([$username]);
     $user = $stmt->fetch();
 
-    // 2. Check: user exists, role is allowed, password matches
+    // 2. Check: user exists, role is allowed, and password matches
     if ($user
         && in_array($user['Role'], $allowedRoles, true)
         && password_verify($password, $user['Password_Hash'])) {
@@ -29,11 +29,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['name']     = $user['FirstName'] . ' ' . $user['LastName'];
         $_SESSION['role']     = $user['Role'];
 
-        header('Location: index.php');
+        header('Location: whoami.php');
         exit;
     }
 
-    // Wrong username, wrong password and patients all get the same message
+    // Wrong username, wrong password, disallowed role, and patients all get the same message
     $error = true;
 }
 ?>

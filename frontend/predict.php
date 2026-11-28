@@ -2,145 +2,669 @@
 $pageTitle = 'Predict';
 $activePage = 'predict';
 require __DIR__ . '/includes/auth.php';
+require __DIR__ . '/includes/db.php';
+
+date_default_timezone_set('Australia/Sydney');
+
+// Escape dynamic values before inserting them into HTML.
+function h($value): string
+{
+    return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+// Validate a one-sample CSV and return its measurements keyed by Biomarker_ID.
+function parseBiomarkerCsv(array $file, array $biomarkers): array
+{
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        throw new RuntimeException('The uploaded CSV could not be read. Please try again.');
+    }
+    if (($file['size'] ?? 0) > 1024 * 1024) {
+        throw new RuntimeException('The CSV file must be no larger than 1 MB.');
+    }
+    if (!is_uploaded_file($file['tmp_name'] ?? '')) {
+        throw new RuntimeException('The uploaded CSV could not be read. Please try again.');
+    }
+
+    $handle = fopen($file['tmp_name'], 'rb');
+    if ($handle === false) {
+        throw new RuntimeException('The uploaded CSV could not be opened.');
+    }
+
+    try {
+        $headers = fgetcsv($handle, null, ',', '"', '');
+        if ($headers === false) {
+            throw new RuntimeException('The CSV file is empty.');
+        }
+        $headers = array_map(static fn($header): string => trim((string) $header), $headers);
+        if ($headers) {
+            $headers[0] = preg_replace('/^\xEF\xBB\xBF/', '', $headers[0]);
+        }
+
+        // Accept both unit-labelled template headers and older plain-name headers.
+        $headerAliases = [];
+        foreach ($biomarkers as $biomarker) {
+            $name = (string) $biomarker['Name'];
+            $unit = trim((string) $biomarker['Unit']);
+            $headerAliases[$name] = $name;
+            if ($unit !== '') {
+                $headerAliases[$name . ' (' . $unit . ')'] = $name;
+            }
+        }
+        $headers = array_map(
+            static fn($header): string => $headerAliases[$header] ?? $header,
+            $headers
+        );
+
+        $expectedNames = array_column($biomarkers, 'Name');
+        if (count($expectedNames) !== 39
+            || array_map('intval', array_column($biomarkers, 'Biomarker_ID')) !== range(1, 39)) {
+            throw new RuntimeException('The database biomarker list is incomplete or out of order.');
+        }
+        if (count($headers) !== 39
+            || count(array_unique($headers)) !== 39
+            || array_diff($expectedNames, $headers)
+            || array_diff($headers, $expectedNames)) {
+            throw new RuntimeException('The CSV header must contain each of the 39 biomarker names from the template exactly once.');
+        }
+
+        $headerIndexes = array_flip($headers);
+        // Ignore blank rows, but allow only one completed sample row.
+        $row = null;
+        while (($nextRow = fgetcsv($handle, null, ',', '"', '')) !== false) {
+            if (!array_filter($nextRow, static fn($value): bool => trim((string) $value) !== '')) {
+                continue;
+            }
+            if ($row !== null) {
+                throw new RuntimeException('The CSV must contain exactly one non-empty sample row.');
+            }
+            $row = $nextRow;
+        }
+        if ($row === null || count($row) !== 39) {
+            throw new RuntimeException('The CSV must contain one row with a value for every biomarker.');
+        }
+
+        $values = [];
+        foreach ($biomarkers as $biomarker) {
+            $rawValue = trim((string) ($row[$headerIndexes[$biomarker['Name']]] ?? ''));
+            if ($rawValue === '' || !is_numeric($rawValue)) {
+                throw new RuntimeException('Enter a numeric value for every biomarker in the CSV.');
+            }
+            $value = (float) $rawValue;
+            if (!is_finite($value) || $value < 0) {
+                throw new RuntimeException('Biomarker values must be finite numbers greater than or equal to zero.');
+            }
+            $values[(int) $biomarker['Biomarker_ID']] = $value;
+        }
+
+        return $values;
+    } finally {
+        fclose($handle);
+    }
+}
+
+// Send a saved Sample_ID to the model API and return its decoded prediction.
+function requestPrediction(int $sampleId): array
+{
+    if (!function_exists('curl_init')) {
+        throw new RuntimeException('PHP cURL is required to contact the prediction service.');
+    }
+
+    $apiBase = rtrim(getenv('PREDICTION_API_URL') ?: 'http://127.0.0.1:8000', '/');
+    $curl = curl_init($apiBase . '/api/predict/sample/' . $sampleId);
+    if ($curl === false) {
+        throw new RuntimeException('Could not initialize a connection to the prediction service.');
+    }
+
+    curl_setopt_array($curl, [
+        CURLOPT_POST => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CONNECTTIMEOUT => 5,
+        CURLOPT_TIMEOUT => 60,
+    ]);
+    $response = curl_exec($curl);
+    $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($curl);
+    if ($response === false) {
+        throw new RuntimeException('Could not reach the prediction service: ' . $curlError);
+    }
+
+    $decoded = json_decode($response, true);
+    if ($status < 200 || $status >= 300 || !is_array($decoded)) {
+        $detail = is_array($decoded) ? ($decoded['detail'] ?? 'Unexpected API response') : 'Invalid API response';
+        throw new RuntimeException('Prediction failed: ' . (is_string($detail) ? $detail : 'The API rejected the request.'));
+    }
+
+    return $decoded;
+}
+
+// Map stable database biomarker IDs to the corresponding HTML form field names.
+$biomarkerFields = [
+    1 => 'afp',
+    2 => 'angiopoietin_2',
+    3 => 'axl',
+    4 => 'ca_125',
+    5 => 'ca_15_3',
+    6 => 'ca19_9',
+    7 => 'cd44',
+    8 => 'cea',
+    9 => 'cyfra_21_1',
+    10 => 'dkk1',
+    11 => 'endoglin',
+    12 => 'fgf2',
+    13 => 'follistatin',
+    14 => 'galectin_3',
+    15 => 'g_csf',
+    16 => 'gdf15',
+    17 => 'he4',
+    18 => 'hgf',
+    19 => 'il_6',
+    20 => 'il_8',
+    21 => 'kallikrein_6',
+    22 => 'leptin',
+    23 => 'mesothelin',
+    24 => 'midkine',
+    25 => 'myeloperoxidase',
+    26 => 'nse',
+    27 => 'opg',
+    28 => 'opn',
+    29 => 'par',
+    30 => 'prolactin',
+    31 => 'segfr',
+    32 => 'sfas',
+    33 => 'shbg',
+    34 => 'sher2_segfr2_serbb2',
+    35 => 'specam_1',
+    36 => 'tgfa',
+    37 => 'thrombospondin_2',
+    38 => 'timp_1',
+    39 => 'timp_2',
+];
+$biomarkerGroups = [
+    'Cancer antigens' => [1, 4, 5, 6, 8, 9, 17, 21, 23, 26, 30],
+    'Cytokines and growth factors' => [2, 10, 12, 13, 15, 16, 18, 19, 20, 22, 24, 36],
+    'Receptors, adhesion and matrix' => [3, 7, 11, 14, 27, 28, 31, 32, 34, 35, 37, 38, 39],
+    'Other proteins' => [25, 29, 33],
+];
+
+// Load database-backed names and units for the form, CSV template, and feedback choices.
+$db = getDb();
+$biomarkers = $db->query('SELECT Biomarker_ID, Name, Unit FROM Biomarkers ORDER BY Biomarker_ID')->fetchAll();
+$cancerOptions = $db->query(
+    'SELECT Cancer_ID, Cancer_Name FROM Cancer_Types ORDER BY Cancer_ID'
+)->fetchAll();
+$biomarkersById = [];
+foreach ($biomarkers as $biomarker) {
+    $biomarkersById[(int) $biomarker['Biomarker_ID']] = $biomarker;
+}
+
+// Build the downloadable template from the same biomarker list used by CSV validation.
+if (isset($_GET['download_template'])) {
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="biomarker_sample_template.csv"');
+    $output = fopen('php://output', 'wb');
+    $headers = array_map(
+        static function ($biomarker): string {
+            $name = (string) $biomarker['Name'];
+            $unit = trim((string) $biomarker['Unit']);
+            return $unit === '' ? $name : $name . ' (' . $unit . ')';
+        },
+        $biomarkers
+    );
+    fputcsv($output, $headers, ',', '"', '');
+    fputcsv($output, array_fill(0, count($biomarkers), ''), ',', '"', '');
+    fclose($output);
+    exit;
+}
+
+if (empty($_SESSION['csrf'])) {
+    $_SESSION['csrf'] = bin2hex(random_bytes(32));
+}
+
+$old = [
+    'patient_id' => '',
+    'sample_code' => '',
+    'collection_date' => '',
+    'sample_type' => 'Plasma',
+    'age_at_collection' => '',
+    'omega_score' => '',
+    'saved_sample_id' => (string) ($_GET['sample_id'] ?? ''),
+    'feedback_type' => '',
+    'suggested_cancer_id' => '',
+    'feedback_comment' => '',
+];
+foreach ($biomarkerFields as $field) {
+    $old[$field] = '';
+}
+
+// Restore the latest result and one-time notices after redirects such as prediction or feedback.
+$errors = [];
+$predictionResult = $_SESSION['prediction_flash'] ?? null;
+$sampleSavedNotice = $_SESSION['sample_saved_flash'] ?? null;
+if ($predictionResult !== null) {
+    $_SESSION['current_prediction'] = $predictionResult;
+} else {
+    $currentPrediction = $_SESSION['current_prediction'] ?? null;
+    $requestedPredictionId = filter_var(
+        $_GET['prediction_id'] ?? $_POST['prediction_id'] ?? false,
+        FILTER_VALIDATE_INT
+    );
+    if (is_array($currentPrediction)
+        && $requestedPredictionId !== false
+        && (int) ($currentPrediction['prediction_id'] ?? 0) === $requestedPredictionId) {
+        $predictionResult = $currentPrediction;
+    }
+}
+$feedbackNotice = $_SESSION['feedback_flash'] ?? null;
+unset($_SESSION['prediction_flash'], $_SESSION['sample_saved_flash'], $_SESSION['feedback_flash']);
+
+// Dispatch each submitted action only after checking the session CSRF token.
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    foreach ($old as $key => $unused) {
+        if (isset($_POST[$key]) && is_string($_POST[$key])) {
+            $old[$key] = trim($_POST[$key]);
+        }
+    }
+
+    if (!hash_equals($_SESSION['csrf'], (string) ($_POST['csrf'] ?? ''))) {
+        $errors[] = 'Your session has expired. Please try again.';
+    } elseif (($_POST['action'] ?? '') === 'run_saved') {
+        $sampleId = filter_var($old['saved_sample_id'], FILTER_VALIDATE_INT);
+        if ($sampleId === false || $sampleId < 1) {
+            $errors[] = 'Enter a valid positive Sample_ID.';
+        } else {
+            try {
+                // Request a prediction from the model API and redirect to the same page with its Prediction ID in the query string.
+                $predictionResult = requestPrediction($sampleId);
+                $predictionId = filter_var($predictionResult['prediction_id'] ?? false, FILTER_VALIDATE_INT);
+                if ($predictionId === false || $predictionId < 1) {
+                    throw new RuntimeException('The prediction service returned no valid Prediction_ID.');
+                }
+                $_SESSION['prediction_flash'] = $predictionResult;
+                header('Location: predict.php?sample_id=' . $sampleId . '&prediction_id=' . $predictionId);
+                exit;
+            } catch (RuntimeException $error) {
+                $errors[] = $error->getMessage();
+            }
+        }
+    } elseif (($_POST['action'] ?? '') === 'submit_feedback') {
+        $predictionId = filter_var($_POST['prediction_id'] ?? false, FILTER_VALIDATE_INT);
+        $feedbackType = $old['feedback_type'];
+        $suggestedCancerId = $old['suggested_cancer_id'] === ''
+            ? null
+            : filter_var($old['suggested_cancer_id'], FILTER_VALIDATE_INT);
+        $comment = $old['feedback_comment'];
+
+        if ($predictionId === false || $predictionId < 1
+            || $predictionResult === null
+            || (int) ($predictionResult['prediction_id'] ?? 0) !== $predictionId) {
+            $errors[] = 'This prediction is no longer available. Run it again before submitting feedback.';
+        }
+        if (!in_array($feedbackType, ['correct', 'incorrect', 'unsure'], true)) {
+            $errors[] = 'Choose a feedback option.';
+        }
+        if ($suggestedCancerId === false) {
+            $errors[] = 'Choose a valid suggested cancer or leave that field empty.';
+        } elseif ($suggestedCancerId !== null) {
+            $validCancerIds = array_map('intval', array_column($cancerOptions, 'Cancer_ID'));
+            if (!in_array($suggestedCancerId, $validCancerIds, true)) {
+                $errors[] = 'Choose a valid suggested cancer or leave that field empty.';
+            }
+        }
+        if (mb_strlen($comment) > 2000) {
+            $errors[] = 'Feedback comments must be 2000 characters or fewer.';
+        }
+
+        if (!$errors) {
+            $existingFeedback = $db->prepare(
+                'SELECT Feedback_ID FROM Prediction_Feedback WHERE Prediction_ID = ? AND User_ID = ?'
+            );
+            $existingFeedback->execute([$predictionId, (int) $_SESSION['user_id']]);
+            if ($existingFeedback->fetchColumn()) {
+                $errors[] = 'You have already submitted feedback for this prediction.';
+            } else {
+                try {
+                    $insertFeedback = $db->prepare(
+                        'INSERT INTO Prediction_Feedback
+                            (Prediction_ID, User_ID, Feedback_Type, Suggested_Cancer_ID, Feedback_Comment)
+                         VALUES (?, ?, ?, ?, ?)'
+                    );
+                    $insertFeedback->execute([
+                        $predictionId,
+                        (int) $_SESSION['user_id'],
+                        $feedbackType,
+                        $suggestedCancerId,
+                        $comment !== '' ? $comment : null,
+                    ]);
+                    $_SESSION['feedback_flash'] = 'Thank you. Your feedback has been saved.';
+                    header('Location: predict.php?sample_id=' . (int) $predictionResult['sample_id']
+                        . '&prediction_id=' . $predictionId);
+                    exit;
+                } catch (PDOException $error) {
+                    if ($error->getCode() === '23000') {
+                        $errors[] = 'You have already submitted feedback for this prediction.';
+                    } else {
+                        error_log('Prediction feedback failed: ' . $error->getMessage());
+                        $errors[] = 'Your feedback could not be saved. Check the PHP error log for details.';
+                    }
+                }
+            }
+        }
+    } elseif (($_POST['action'] ?? '') === 'save_sample') {
+        // Validate sample metadata and all biomarker values before writing anything.
+        $patientId = filter_var($old['patient_id'], FILTER_VALIDATE_INT);
+        if ($patientId === false || $patientId < 1) {
+            $errors[] = 'Enter a valid existing Patient_ID.';
+        }
+        if (mb_strlen($old['sample_code']) > 30) {
+            $errors[] = 'Sample code must be 30 characters or fewer.';
+        }
+        if (mb_strlen($old['sample_type']) > 50) {
+            $errors[] = 'Sample type must be 50 characters or fewer.';
+        }
+
+        $age = filter_var($old['age_at_collection'], FILTER_VALIDATE_INT);
+        if ($age === false || $age < 0 || $age > 120) {
+            $errors[] = 'Age at collection must be a whole number from 0 to 120.';
+        }
+        if ($old['omega_score'] === '' || !is_numeric($old['omega_score']) || !is_finite((float) $old['omega_score'])) {
+            $errors[] = 'Enter a valid numeric omega score.';
+        }
+
+        $collectionDate = null;
+        if ($old['collection_date'] !== '') {
+            $date = DateTimeImmutable::createFromFormat('!Y-m-d', $old['collection_date']);
+            if (!$date || $date->format('Y-m-d') !== $old['collection_date']) {
+                $errors[] = 'Enter a valid collection date.';
+            } elseif ($date > new DateTimeImmutable('today')) {
+                $errors[] = 'Collection date cannot be in the future.';
+            } else {
+                $collectionDate = $old['collection_date'];
+            }
+        }
+
+        $measurements = null;
+        $uploadError = $_FILES['biomarker_file']['error'] ?? UPLOAD_ERR_NO_FILE;
+        if (!$errors && $uploadError !== UPLOAD_ERR_NO_FILE) {
+            try {
+                $measurements = parseBiomarkerCsv($_FILES['biomarker_file'], $biomarkers);
+            } catch (RuntimeException $error) {
+                $errors[] = $error->getMessage();
+            }
+        } elseif (!$errors) {
+            $measurements = [];
+            foreach ($biomarkers as $biomarker) {
+                $biomarkerId = (int) $biomarker['Biomarker_ID'];
+                $field = $biomarkerFields[$biomarkerId] ?? null;
+                if ($field === null || !isset($_POST[$field]) || !is_string($_POST[$field]) || trim($_POST[$field]) === '') {
+                    $errors[] = 'Enter all 39 biomarker values or upload a CSV file.';
+                    break;
+                }
+                $rawValue = trim($_POST[$field]);
+                if (!is_numeric($rawValue)) {
+                    $errors[] = 'Biomarker values must be numeric.';
+                    break;
+                }
+                $value = (float) $rawValue;
+                if (!is_finite($value) || $value < 0) {
+                    $errors[] = 'Biomarker values must be finite numbers greater than or equal to zero.';
+                    break;
+                }
+                $measurements[$biomarkerId] = $value;
+            }
+        }
+
+        if (!$errors) {
+            $patient = $db->prepare(
+                'SELECT st.Sex_Name, rt.Race_Name
+                 FROM Patients p
+                 JOIN Sex_Types st ON st.Sex_Type_ID = p.Sex_Type_ID
+                 JOIN Race_Types rt ON rt.Race_Type_ID = p.Race_Type_ID
+                 WHERE p.Patient_ID = ?'
+            );
+            $patient->execute([$patientId]);
+            $patientDetails = $patient->fetch();
+            if (!$patientDetails) {
+                $errors[] = 'That Patient_ID was not found. Find an existing patient in the Patients section.';
+            } elseif (!in_array($patientDetails['Sex_Name'], ['Female', 'Male'], true)
+                || !in_array($patientDetails['Race_Name'], [
+                    'Asian', 'Black', 'Black/Hispanic', 'Caucasian',
+                    'Caucasian/Hispanic', 'Hispanic', 'Other', 'Unknown',
+                ], true)) {
+                $errors[] = 'This patient has demographic values that are not supported by the prediction model.';
+            }
+        }
+
+        if (!$errors) {
+            try {
+                // Save the sample and its 39 measurements atomically.
+                $db->beginTransaction();
+                $insertSample = $db->prepare(
+                    'INSERT INTO Samples (Sample_Code, Patient_ID, Uploaded_By, Collection_Date, Sample_Type, Age_At_Collection, Omega_Score)
+                     VALUES (?, ?, ?, ?, ?, ?, ?)'
+                );
+                $insertSample->execute([
+                    $old['sample_code'] !== '' ? $old['sample_code'] : null,
+                    $patientId,
+                    (int) $_SESSION['user_id'],
+                    $collectionDate,
+                    $old['sample_type'] !== '' ? $old['sample_type'] : null,
+                    $age,
+                    (float) $old['omega_score'],
+                ]);
+                $sampleId = (int) $db->lastInsertId();
+
+                $insertMeasurement = $db->prepare(
+                    'INSERT INTO Biomarker_Measurements (Sample_ID, Biomarker_ID, Value) VALUES (?, ?, ?)'
+                );
+                foreach ($measurements as $biomarkerId => $value) {
+                    $insertMeasurement->execute([$sampleId, $biomarkerId, $value]);
+                }
+                $db->commit();
+            } catch (PDOException $error) {
+                if ($db->inTransaction()) {
+                    $db->rollBack();
+                }
+                error_log('Sample upload failed: ' . $error->getMessage());
+                $errors[] = $error->getCode() === '23000'
+                    ? 'That sample code is already in use or the submitted records violate a database constraint.'
+                    : 'The sample could not be saved. Check the PHP error log for details.';
+            }
+
+            if (!$errors) {
+                $_SESSION['sample_saved_flash'] = 'Sample saved successfully as Sample_ID ' . $sampleId
+                    . '. Its ID has been entered in the prediction form.';
+                header('Location: predict.php?sample_id=' . $sampleId);
+                exit;
+            }
+        }
+    } else {
+        $errors[] = 'Choose a valid sample action and try again.';
+    }
+}
+
+$feedbackSubmitted = false;
+$predictionPatientId = null;
+if ($predictionResult !== null) {
+    // Resolve the patient for the exact-sample details link and check for existing feedback.
+    $samplePatient = $db->prepare('SELECT Patient_ID FROM Samples WHERE Sample_ID = ?');
+    $samplePatient->execute([(int) $predictionResult['sample_id']]);
+    $patientId = $samplePatient->fetchColumn();
+    if ($patientId !== false) {
+        $predictionPatientId = (int) $patientId;
+    }
+
+    $feedbackCheck = $db->prepare(
+        'SELECT Feedback_ID FROM Prediction_Feedback WHERE Prediction_ID = ? AND User_ID = ?'
+    );
+    $feedbackCheck->execute([
+        (int) $predictionResult['prediction_id'],
+        (int) $_SESSION['user_id'],
+    ]);
+    $feedbackSubmitted = (bool) $feedbackCheck->fetchColumn();
+}
+
 include __DIR__ . '/includes/header.php';
 ?>
+<!-- Sample entry stays on the left; prediction, result, and feedback stay on the right. -->
 <div class="predict">
-  <form class="card form" action="#" method="post">
-    <fieldset class="group-box">
-      <legend>Patient and sample</legend>
-      <div class="fields">
-        <div class="field"><label for="patient_id">Patient ID</label><input id="patient_id" name="patient_id" type="text" placeholder="P-1024"></div>
-        <div class="field"><label for="sample_id">Sample ID</label><input id="sample_id" name="sample_id" type="text" placeholder="S-0412"></div>
-        <div class="field"><label for="age">Age</label><input id="age" name="age" type="number" min="0" max="120"></div>
-        <div class="field"><label for="sex">Sex</label><select id="sex" name="sex"><option value="">Select</option><option>Female</option><option>Male</option></select></div>
-        <div class="field"><label for="race">Race</label><select id="race" name="race"><option value="">Select</option><option>Asian</option><option>Black</option><option>Black/Hispanic</option><option>Caucasian</option><option>Caucasian/Hispanic</option><option>Hispanic</option><option>Other</option><option>Unknown</option></select></div>
-        <div class="field"><label for="omega">&Omega; score</label><input id="omega" name="omega" type="number" step="any"></div>
+  <section class="card form">
+    <h2>Save a sample</h2>
+    <p class="muted-text">Enter biomarker values manually or upload a CSV, then save the sample. Saving does not run a prediction.</p>
+
+    <?php if ($errors && !in_array($_POST['action'] ?? '', ['run_saved', 'submit_feedback'], true)): ?>
+      <div class="alert" role="alert">
+        <?php foreach ($errors as $error): ?><div><?= h($error) ?></div><?php endforeach; ?>
       </div>
-    </fieldset>
+    <?php endif; ?>
+    <?php if ($sampleSavedNotice !== null): ?>
+      <p class="note" role="status"><?= h($sampleSavedNotice) ?> Select <strong>Run prediction</strong> on the right when ready.</p>
+    <?php endif; ?>
 
-    <div class="upload">
-      <div><strong>Have the values in a file?</strong><small>Upload a CSV with one column per biomarker.</small></div>
-      <input type="file" name="biomarker_file" accept=".csv" aria-label="Upload biomarker CSV">
-    </div>
+    <form action="predict.php" method="post" enctype="multipart/form-data">
+      <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
+      <input type="hidden" name="action" value="save_sample">
+      <input type="hidden" name="MAX_FILE_SIZE" value="1048576">
+      <fieldset class="group-box">
+        <legend>Patient and sample details</legend>
+        <div class="fields">
+          <div class="field">
+            <label for="patient_id">Existing Patient_ID</label>
+            <input id="patient_id" name="patient_id" type="number" min="1" step="1" value="<?= h($old['patient_id']) ?>" required>
+            <small>Look up the patient in <a href="patients.php">Patients</a>. Sex and race are read from their record.</small>
+          </div>
+          <div class="field"><label for="sample_code">Sample code (optional)</label><input id="sample_code" name="sample_code" type="text" maxlength="30" value="<?= h($old['sample_code']) ?>"><small>Leave blank if there is no external code. The generated Sample_ID is used for prediction.</small></div>
+          <div class="field"><label for="collection_date">Collection date (optional)</label><input id="collection_date" name="collection_date" type="date" max="<?= date('Y-m-d') ?>" value="<?= h($old['collection_date']) ?>"></div>
+          <div class="field"><label for="sample_type">Sample type</label><input id="sample_type" name="sample_type" type="text" maxlength="50" value="<?= h($old['sample_type']) ?>" placeholder="Plasma"></div>
+          <div class="field"><label for="age_at_collection">Age at collection</label><input id="age_at_collection" name="age_at_collection" type="number" min="0" max="120" step="1" value="<?= h($old['age_at_collection']) ?>" required></div>
+          <div class="field"><label for="omega_score">&Omega; score</label><input id="omega_score" name="omega_score" type="number" step="any" value="<?= h($old['omega_score']) ?>" required></div>
+        </div>
+      </fieldset>
 
-    <h2 class="form-title">Blood protein biomarkers</h2>
-        <details class="group" open>
-          <summary>Cancer antigens<small>11 proteins</small></summary>
-          <div class="fields"><div class="field"><label for="afp">AFP</label><div class="input-unit"><input id="afp" name="afp" type="number" step="any" min="0" inputmode="decimal"><span>pg/ml</span></div></div><div class="field"><label for="ca_125">CA-125</label><div class="input-unit"><input id="ca_125" name="ca_125" type="number" step="any" min="0" inputmode="decimal"><span>U/ml</span></div></div><div class="field"><label for="ca_15_3">CA 15-3</label><div class="input-unit"><input id="ca_15_3" name="ca_15_3" type="number" step="any" min="0" inputmode="decimal"><span>U/ml</span></div></div><div class="field"><label for="ca19_9">CA19-9</label><div class="input-unit"><input id="ca19_9" name="ca19_9" type="number" step="any" min="0" inputmode="decimal"><span>U/ml</span></div></div><div class="field"><label for="cea">CEA</label><div class="input-unit"><input id="cea" name="cea" type="number" step="any" min="0" inputmode="decimal"><span>pg/ml</span></div></div><div class="field"><label for="cyfra_21_1">CYFRA 21-1</label><div class="input-unit"><input id="cyfra_21_1" name="cyfra_21_1" type="number" step="any" min="0" inputmode="decimal"><span>pg/ml</span></div></div><div class="field"><label for="he4">HE4</label><div class="input-unit"><input id="he4" name="he4" type="number" step="any" min="0" inputmode="decimal"><span>pg/ml</span></div></div><div class="field"><label for="mesothelin">Mesothelin</label><div class="input-unit"><input id="mesothelin" name="mesothelin" type="number" step="any" min="0" inputmode="decimal"><span>ng/ml</span></div></div><div class="field"><label for="nse">NSE</label><div class="input-unit"><input id="nse" name="nse" type="number" step="any" min="0" inputmode="decimal"><span>ng/ml</span></div></div><div class="field"><label for="kallikrein_6">Kallikrein-6</label><div class="input-unit"><input id="kallikrein_6" name="kallikrein_6" type="number" step="any" min="0" inputmode="decimal"><span>pg/ml</span></div></div><div class="field"><label for="prolactin">Prolactin</label><div class="input-unit"><input id="prolactin" name="prolactin" type="number" step="any" min="0" inputmode="decimal"><span>pg/ml</span></div></div></div>
-        </details>
-        <details class="group" open>
-          <summary>Cytokines and growth factors<small>12 proteins</small></summary>
-          <div class="fields"><div class="field"><label for="angiopoietin_2">Angiopoietin-2</label><div class="input-unit"><input id="angiopoietin_2" name="angiopoietin_2" type="number" step="any" min="0" inputmode="decimal"><span>pg/ml</span></div></div><div class="field"><label for="fgf2">FGF2</label><div class="input-unit"><input id="fgf2" name="fgf2" type="number" step="any" min="0" inputmode="decimal"><span>pg/ml</span></div></div><div class="field"><label for="g_csf">G-CSF</label><div class="input-unit"><input id="g_csf" name="g_csf" type="number" step="any" min="0" inputmode="decimal"><span>pg/ml</span></div></div><div class="field"><label for="hgf">HGF</label><div class="input-unit"><input id="hgf" name="hgf" type="number" step="any" min="0" inputmode="decimal"><span>pg/ml</span></div></div><div class="field"><label for="il_6">IL-6</label><div class="input-unit"><input id="il_6" name="il_6" type="number" step="any" min="0" inputmode="decimal"><span>pg/ml</span></div></div><div class="field"><label for="il_8">IL-8</label><div class="input-unit"><input id="il_8" name="il_8" type="number" step="any" min="0" inputmode="decimal"><span>pg/ml</span></div></div><div class="field"><label for="midkine">Midkine</label><div class="input-unit"><input id="midkine" name="midkine" type="number" step="any" min="0" inputmode="decimal"><span>pg/ml</span></div></div><div class="field"><label for="tgfa">TGFa</label><div class="input-unit"><input id="tgfa" name="tgfa" type="number" step="any" min="0" inputmode="decimal"><span>pg/ml</span></div></div><div class="field"><label for="leptin">Leptin</label><div class="input-unit"><input id="leptin" name="leptin" type="number" step="any" min="0" inputmode="decimal"><span>pg/ml</span></div></div><div class="field"><label for="gdf15">GDF15</label><div class="input-unit"><input id="gdf15" name="gdf15" type="number" step="any" min="0" inputmode="decimal"><span>ng/ml</span></div></div><div class="field"><label for="follistatin">Follistatin</label><div class="input-unit"><input id="follistatin" name="follistatin" type="number" step="any" min="0" inputmode="decimal"><span>pg/ml</span></div></div><div class="field"><label for="dkk1">DKK1</label><div class="input-unit"><input id="dkk1" name="dkk1" type="number" step="any" min="0" inputmode="decimal"><span>ng/ml</span></div></div></div>
-        </details>
-        <details class="group" open>
-          <summary>Receptors, adhesion and matrix<small>13 proteins</small></summary>
-          <div class="fields"><div class="field"><label for="axl">AXL</label><div class="input-unit"><input id="axl" name="axl" type="number" step="any" min="0" inputmode="decimal"><span>pg/ml</span></div></div><div class="field"><label for="cd44">CD44</label><div class="input-unit"><input id="cd44" name="cd44" type="number" step="any" min="0" inputmode="decimal"><span>ng/ml</span></div></div><div class="field"><label for="endoglin">Endoglin</label><div class="input-unit"><input id="endoglin" name="endoglin" type="number" step="any" min="0" inputmode="decimal"><span>pg/ml</span></div></div><div class="field"><label for="segfr">sEGFR</label><div class="input-unit"><input id="segfr" name="segfr" type="number" step="any" min="0" inputmode="decimal"><span>pg/ml</span></div></div><div class="field"><label for="sfas">sFas</label><div class="input-unit"><input id="sfas" name="sfas" type="number" step="any" min="0" inputmode="decimal"><span>pg/ml</span></div></div><div class="field"><label for="sher2_segfr2_serbb2">sHER2/sEGFR2/sErbB2</label><div class="input-unit"><input id="sher2_segfr2_serbb2" name="sher2_segfr2_serbb2" type="number" step="any" min="0" inputmode="decimal"><span>pg/ml</span></div></div><div class="field"><label for="specam_1">sPECAM-1</label><div class="input-unit"><input id="specam_1" name="specam_1" type="number" step="any" min="0" inputmode="decimal"><span>pg/ml</span></div></div><div class="field"><label for="galectin_3">Galectin-3</label><div class="input-unit"><input id="galectin_3" name="galectin_3" type="number" step="any" min="0" inputmode="decimal"><span>ng/ml</span></div></div><div class="field"><label for="opg">OPG</label><div class="input-unit"><input id="opg" name="opg" type="number" step="any" min="0" inputmode="decimal"><span>ng/ml</span></div></div><div class="field"><label for="opn">OPN</label><div class="input-unit"><input id="opn" name="opn" type="number" step="any" min="0" inputmode="decimal"><span>pg/ml</span></div></div><div class="field"><label for="thrombospondin_2">Thrombospondin-2</label><div class="input-unit"><input id="thrombospondin_2" name="thrombospondin_2" type="number" step="any" min="0" inputmode="decimal"><span>pg/ml</span></div></div><div class="field"><label for="timp_1">TIMP-1</label><div class="input-unit"><input id="timp_1" name="timp_1" type="number" step="any" min="0" inputmode="decimal"><span>pg/ml</span></div></div><div class="field"><label for="timp_2">TIMP-2</label><div class="input-unit"><input id="timp_2" name="timp_2" type="number" step="any" min="0" inputmode="decimal"><span>pg/ml</span></div></div></div>
-        </details>
-        <details class="group" open>
-          <summary>Other proteins<small>3 proteins</small></summary>
-          <div class="fields"><div class="field"><label for="myeloperoxidase">Myeloperoxidase</label><div class="input-unit"><input id="myeloperoxidase" name="myeloperoxidase" type="number" step="any" min="0" inputmode="decimal"><span>ng/ml</span></div></div><div class="field"><label for="par">PAR</label><div class="input-unit"><input id="par" name="par" type="number" step="any" min="0" inputmode="decimal"><span>pg/ml</span></div></div><div class="field"><label for="shbg">SHBG</label><div class="input-unit"><input id="shbg" name="shbg" type="number" step="any" min="0" inputmode="decimal"><span>nM</span></div></div></div>
-        </details>
-
-    <div class="form-actions">
-      <button class="button" type="submit">Run prediction</button>
-      <button class="button ghost" type="reset">Clear form</button>
-    </div>
-  </form>
-
-  <aside class="card results">
-    <div class="card-head"><h2>Results</h2><span class="badge">Example output</span></div>
-    <p class="muted-text">This is what you will see after running a prediction. The numbers below are placeholders.</p>
-
-    <div class="result-top">
-      <div><small>Chance of cancer</small><strong class="big">0.88</strong><span class="pill high">Cancer</span></div>
-      <div><small>Highest protein influence</small><strong>CA-125</strong></div>
-    </div>
-
-    <h3>Likelihood by organ</h3>
-        <div class="bar-row wide">
-          <span class="bar-label">Breast</span>
-          <div class="bar-track"><div class="bar-fill muted" style="width: 4%"></div></div>
-          <span class="bar-value">0.04</span>
+      <div class="upload">
+        <div>
+          <strong>Optional CSV import</strong>
+          <small>Upload one row with a header for each of the 39 biomarkers; units are shown in the headers.</small>
+          <a class="text-link" href="predict.php?download_template=1">Download CSV template</a>
         </div>
-        <div class="bar-row wide">
-          <span class="bar-label">Colorectum</span>
-          <div class="bar-track"><div class="bar-fill muted" style="width: 6%"></div></div>
-          <span class="bar-value">0.06</span>
-        </div>
-        <div class="bar-row wide">
-          <span class="bar-label">Esophagus</span>
-          <div class="bar-track"><div class="bar-fill muted" style="width: 3%"></div></div>
-          <span class="bar-value">0.03</span>
-        </div>
-        <div class="bar-row wide">
-          <span class="bar-label">Liver</span>
-          <div class="bar-track"><div class="bar-fill muted" style="width: 2%"></div></div>
-          <span class="bar-value">0.02</span>
-        </div>
-        <div class="bar-row wide">
-          <span class="bar-label">Lung</span>
-          <div class="bar-track"><div class="bar-fill muted" style="width: 5%"></div></div>
-          <span class="bar-value">0.05</span>
-        </div>
-        <div class="bar-row wide top">
-          <span class="bar-label">Ovary</span>
-          <div class="bar-track"><div class="bar-fill" style="width: 82%"></div></div>
-          <span class="bar-value">0.82</span>
-        </div>
-        <div class="bar-row wide">
-          <span class="bar-label">Pancreas</span>
-          <div class="bar-track"><div class="bar-fill muted" style="width: 7%"></div></div>
-          <span class="bar-value">0.07</span>
-        </div>
-        <div class="bar-row wide">
-          <span class="bar-label">Stomach</span>
-          <div class="bar-track"><div class="bar-fill muted" style="width: 3%"></div></div>
-          <span class="bar-value">0.03</span>
-        </div>
-    <p class="note">Missing-cancer score: 0.03</p>
-
-    <h3>Most influential biomarkers</h3>
-        <div class="bar-row wide">
-          <span class="bar-label">CA-125</span>
-          <div class="bar-track"><div class="bar-fill ink" style="width: 100%"></div></div>
-          <span class="bar-value">0.31</span>
-        </div>
-        <div class="bar-row wide">
-          <span class="bar-label">HE4</span>
-          <div class="bar-track"><div class="bar-fill ink" style="width: 71%"></div></div>
-          <span class="bar-value">0.22</span>
-        </div>
-        <div class="bar-row wide">
-          <span class="bar-label">CEA</span>
-          <div class="bar-track"><div class="bar-fill ink" style="width: 29%"></div></div>
-          <span class="bar-value">0.09</span>
-        </div>
-        <div class="bar-row wide">
-          <span class="bar-label">IL-6</span>
-          <div class="bar-track"><div class="bar-fill ink" style="width: 23%"></div></div>
-          <span class="bar-value">0.07</span>
-        </div>
-        <div class="bar-row wide">
-          <span class="bar-label">Mesothelin</span>
-          <div class="bar-track"><div class="bar-fill ink" style="width: 16%"></div></div>
-          <span class="bar-value">0.05</span>
-        </div>
-
-    <p class="meta">Run by Dr. Placeholder &middot; 26 Nov 2026, 09:14 &middot; DeCancer v1.0</p>
-
-    <form class="feedback" action="#" method="post">
-      <h3>Was this prediction right?</h3>
-      <div class="choice" role="radiogroup" aria-label="Feedback on this prediction">
-        <label><input type="radio" name="feedback_type" value="correct"><span>Correct</span></label>
-        <label><input type="radio" name="feedback_type" value="incorrect"><span>Incorrect</span></label>
-        <label><input type="radio" name="feedback_type" value="unsure"><span>Unsure</span></label>
+        <input type="file" name="biomarker_file" accept=".csv,text/csv" aria-label="Upload biomarker CSV">
       </div>
-      <label for="suggested">If incorrect, what do you think it is?</label>
-      <select id="suggested" name="suggested_cancer"><option value="">Select (optional)</option><option>Breast</option><option>Colorectum</option><option>Esophagus</option><option>Liver</option><option>Lung</option><option>Ovary</option><option>Pancreas</option><option>Stomach</option><option>Normal (cancer-free)</option></select>
-      <label for="comment">Comment (optional)</label>
-      <textarea id="comment" name="comment" rows="3"></textarea>
-      <button class="button" type="submit">Send feedback</button>
+
+      <h2 class="form-title">Blood protein biomarkers</h2>
+      <?php foreach ($biomarkerGroups as $groupName => $biomarkerIds): ?>
+        <details class="group" open>
+          <summary><?= h($groupName) ?><small><?= count($biomarkerIds) ?> proteins</small></summary>
+          <div class="fields">
+            <?php foreach ($biomarkerIds as $biomarkerId):
+                $biomarker = $biomarkersById[$biomarkerId];
+                $field = $biomarkerFields[$biomarkerId];
+            ?>
+              <div class="field">
+                <label for="<?= h($field) ?>"><?= h($biomarker['Name']) ?></label>
+                <div class="input-unit">
+                  <input id="<?= h($field) ?>" name="<?= h($field) ?>" type="number" step="any" min="0" inputmode="decimal" value="<?= h($old[$field]) ?>">
+                  <span><?= h($biomarker['Unit']) ?></span>
+                </div>
+              </div>
+            <?php endforeach; ?>
+          </div>
+        </details>
+      <?php endforeach; ?>
+
+      <div class="form-actions">
+        <button class="button" type="submit">Save sample</button>
+        <button class="button ghost" type="reset">Clear form</button>
+      </div>
     </form>
-  </aside>
+  </section>
+
+  <div class="predict-side">
+    <section class="card form">
+      <h2>Predict an already saved sample</h2>
+      <p class="muted-text">Enter a database Sample_ID, then run the saved sample through the model.</p>
+      <?php if ($errors && ($_POST['action'] ?? '') === 'run_saved'): ?>
+        <div class="alert" role="alert">
+          <?php foreach ($errors as $error): ?><div><?= h($error) ?></div><?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+      <form action="predict.php" method="post">
+        <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
+        <input type="hidden" name="action" value="run_saved">
+        <div class="fields">
+          <div class="field"><label for="saved_sample_id">Database Sample_ID</label><input id="saved_sample_id" name="saved_sample_id" type="number" min="1" step="1" value="<?= h($old['saved_sample_id']) ?>" required></div>
+        </div>
+        <div class="form-actions"><button class="button" type="submit">Run prediction</button></div>
+      </form>
+    </section>
+
+    <?php if ($predictionResult !== null): ?>
+      <section class="card results" aria-live="polite">
+        <div class="card-head"><h2>Prediction result</h2><span class="badge">Sample <?= (int) $predictionResult['sample_id'] ?></span></div>
+        <?php if ($predictionPatientId !== null): ?>
+          <p class="meta"><a class="text-link" href="patient.php?id=<?= $predictionPatientId ?>&amp;sample=<?= (int) $predictionResult['sample_id'] ?>">View patient and input details</a></p>
+        <?php endif; ?>
+        <div class="result-top">
+          <div>
+            <small>Pancancer probability</small>
+            <strong class="big"><?= number_format((float) $predictionResult['pancancer_probability'], 3) ?></strong>
+            <span class="pill <?= $predictionResult['highest_result'] === 'cancer' ? 'high' : 'low' ?>"><?= h(ucfirst((string) $predictionResult['highest_result'])) ?></span>
+          </div>
+          <div>
+            <small>Highest cancer-specific score</small>
+            <strong><?= h((string) $predictionResult['highest_cancer_type']) ?></strong>
+            <span><?= number_format((float) $predictionResult['highest_probability'] * 100, 1) ?>%</span>
+          </div>
+        </div>
+        <h3>Likelihood by cancer type</h3>
+        <?php foreach ($predictionResult['cancer_scores'] as $cancerType => $score):
+            $scorePercent = max(0, min(100, (float) $score * 100));
+        ?>
+          <div class="bar-row wide">
+            <span class="bar-label"><?= h((string) $cancerType) ?></span>
+            <div class="bar-track"><div class="bar-fill<?= $cancerType === $predictionResult['highest_cancer_type'] ? '' : ' muted' ?>" style="width: <?= $scorePercent ?>%"></div></div>
+            <span class="bar-value"><?= number_format((float) $score, 3) ?></span>
+          </div>
+        <?php endforeach; ?>
+        <p class="muted-text">Prediction ID <?= (int) $predictionResult['prediction_id'] ?>. Research demo only; this output is not a diagnosis.</p>
+
+      <div class="feedback-panel">
+        <h2>Was this prediction right?</h2>
+        <?php if ($feedbackNotice !== null): ?>
+          <p class="note" role="status"><?= h($feedbackNotice) ?></p>
+        <?php endif; ?>
+        <?php if ($errors && ($_POST['action'] ?? '') === 'submit_feedback'): ?>
+          <div class="alert" role="alert">
+            <?php foreach ($errors as $error): ?><div><?= h($error) ?></div><?php endforeach; ?>
+          </div>
+        <?php endif; ?>
+        <?php if ($feedbackSubmitted): ?>
+          <p class="muted-text">You have already submitted feedback for this prediction.</p>
+        <?php else: ?>
+          <form class="feedback" action="predict.php" method="post">
+            <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
+            <input type="hidden" name="action" value="submit_feedback">
+            <input type="hidden" name="prediction_id" value="<?= (int) $predictionResult['prediction_id'] ?>">
+            <div class="choice" role="radiogroup" aria-label="Feedback on this prediction">
+              <?php foreach (['correct' => 'Correct', 'incorrect' => 'Incorrect', 'unsure' => 'Unsure'] as $value => $label): ?>
+                <label><input type="radio" name="feedback_type" value="<?= h($value) ?>"<?= $old['feedback_type'] === $value ? ' checked' : '' ?> required><span><?= h($label) ?></span></label>
+              <?php endforeach; ?>
+            </div>
+            <label for="suggested_cancer_id">If incorrect, what do you think it is?</label>
+            <select id="suggested_cancer_id" name="suggested_cancer_id">
+              <option value="">Select (optional)</option>
+              <?php foreach ($cancerOptions as $cancer): ?>
+                <option value="<?= (int) $cancer['Cancer_ID'] ?>"<?= (string) $cancer['Cancer_ID'] === $old['suggested_cancer_id'] ? ' selected' : '' ?>><?= h($cancer['Cancer_Name']) ?></option>
+              <?php endforeach; ?>
+            </select>
+            <label for="feedback_comment">Comment (optional)</label>
+            <textarea id="feedback_comment" name="feedback_comment" rows="3" maxlength="2000"><?= h($old['feedback_comment']) ?></textarea>
+            <button class="button" type="submit">Send feedback</button>
+          </form>
+        <?php endif; ?>
+      </div>
+      </section>
+    <?php endif; ?>
+  </div>
+
+  <p class="note">Model scores are for research demonstration only and are not a clinical diagnosis.</p>
 </div>
 <?php include __DIR__ . '/includes/footer.php'; ?>

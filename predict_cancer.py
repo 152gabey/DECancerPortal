@@ -134,12 +134,11 @@ def get_sample_inputs(connection, sample_code: str) -> list[float]:
 
     try:
         cur.execute(f"""
-        SELECT b.Model_Feature_Name, m.Value
+        SELECT m.Value
         FROM Biomarker_Measurements m
         JOIN Samples s ON s.Sample_ID = m.Sample_ID
-        JOIN Biomarkers b ON b.Biomarker_ID = m.Biomarker_ID
         WHERE s.Sample_Code = '{sample_code}'
-        ORDER BY b.Biomarker_ID;
+        ORDER BY m.Biomarker_ID;
         """)
         proteins = cur.fetchall()
 
@@ -151,13 +150,13 @@ def get_sample_inputs(connection, sample_code: str) -> list[float]:
         """)
         categorical = cur.fetchone()
 
-        features = [p[1] for p in proteins] + [c for c in categorical] if categorical else []
+        features = [p[0] for p in proteins] + [c for c in categorical] if categorical else []
         return features
     finally:
         cur.close()
 
 
-def save_test_data(user_id: int, verbose: bool = False) -> int:
+def save_test_data(verbose: bool = False) -> int:
     """
     Generate predictions for all test samples and save to database.
     
@@ -165,7 +164,6 @@ def save_test_data(user_id: int, verbose: bool = False) -> int:
     and stores results in the Predictions and Prediction_Scores tables.
     
     Args:
-        user_id: The user ID to associate with predictions
         verbose: If True, print progress information
         
     Returns:
@@ -250,21 +248,17 @@ def save_test_data(user_id: int, verbose: bool = False) -> int:
             cur.execute(f"""
               INSERT INTO Predictions (
                 Sample_ID, 
-                User_ID, 
                 Date, 
                 Pancancer_Probability, 
                 Prediction_Result, 
-                Missing_Cancer_Score, 
                 Highest_Protein_Influence, 
                 Highest_Biomarker_ID, 
                 Model_Version
               ) VALUES (
                 {sample_id}, 
-                {user_id}, 
                 NOW(), 
                 {pancancer['probability']}, 
                 '{best['prediction_result']}', 
-                NULL, 
                 {best['highest_protein_influence']}, 
                 {best['highest_biomarker_id']}, 
                 '{settings.model_version}'
@@ -304,11 +298,6 @@ def main() -> int:
         description="Generate cancer predictions for database samples using trained models."
     )
     parser.add_argument(
-        "user_id",
-        type=int,
-        help="User ID to associate with predictions"
-    )
-    parser.add_argument(
         "-v", "--verbose",
         action="store_true",
         help="Print progress information"
@@ -317,7 +306,7 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        count = save_test_data(args.user_id, verbose=args.verbose)
+        count = save_test_data(verbose=args.verbose)
         if args.verbose:
             print(f"\n✓ Successfully saved {count} predictions")
         return 0
