@@ -14,9 +14,12 @@ function h($value): string            // makes text safe to print inside HTML
 // 1. Which patient? The number after "?id=" in the address
 $id = (int) ($_GET['id'] ?? 0);
 
-$stmt = $db->prepare('SELECT Patient_ID, FirstName, LastName, Sex, Race, Country,
-        TIMESTAMPDIFF(YEAR, Date_of_Birth, CURDATE()) AS Age
-    FROM Patients WHERE Patient_ID = ?');
+$stmt = $db->prepare('SELECT p.Patient_ID, p.FirstName, p.LastName, st.Sex_Name AS Sex, rt.Race_Name AS Race, p.Country,
+        TIMESTAMPDIFF(YEAR, p.Date_of_Birth, CURDATE()) AS Age
+    FROM Patients p
+    LEFT JOIN Sex_Types st ON st.Sex_Type_ID = p.Sex_Type_ID
+    LEFT JOIN Race_Types rt ON rt.Race_Type_ID = p.Race_Type_ID
+    WHERE p.Patient_ID = ?');
 $stmt->execute([$id]);
 $patient = $stmt->fetch();
 

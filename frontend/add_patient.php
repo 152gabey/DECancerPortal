@@ -11,9 +11,11 @@ function h($value): string            // makes text safe to print inside HTML
     return htmlspecialchars((string) $value, ENT_QUOTES);
 }
 
-// The only values the dropdowns may send (the same ones stored in the database)
-$sexOptions  = ['Female', 'Male'];
-$raceOptions = ['Asian', 'Black', 'Black/Hispanic', 'Caucasian', 'Caucasian/Hispanic', 'Hispanic', 'Other', 'Unknown'];
+$db = getDb();
+
+// The only values the dropdowns may send, read from the lookup tables as [id => name]
+$sexOptions  = $db->query('SELECT Sex_Type_ID, Sex_Name FROM Sex_Types ORDER BY Sex_Type_ID')->fetchAll(PDO::FETCH_KEY_PAIR);
+$raceOptions = $db->query('SELECT Race_Type_ID, Race_Name FROM Race_Types ORDER BY Race_Type_ID')->fetchAll(PDO::FETCH_KEY_PAIR);
 
 // A secret code stored in the session and sent back with the form.
 // It proves the form came from this site and not from somewhere else.
@@ -61,15 +63,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // 3. If everything is fine, save the patient and open their page
     if (!$errors) {
-        $db = getDb();
-        $stmt = $db->prepare('INSERT INTO Patients (FirstName, LastName, Date_of_Birth, Sex, Race, Country, Created_Date)
+        // The table stores the ID of the chosen sex and race, so look those up from the names
+        $sexId  = array_search($old['sex'], $sexOptions, true);
+        $raceId = array_search($old['race'], $raceOptions, true);
+
+        $stmt = $db->prepare('INSERT INTO Patients (FirstName, LastName, Date_of_Birth, Sex_Type_ID, Race_Type_ID, Country, Created_Date)
             VALUES (?, ?, ?, ?, ?, ?, NOW())');
         $stmt->execute([
             $old['first_name'],
             $old['last_name'],
             $old['date_of_birth'],
-            $old['sex'],
-            $old['race'],
+            $sexId,
+            $raceId,
             $old['country'] !== '' ? $old['country'] : null,
         ]);
 

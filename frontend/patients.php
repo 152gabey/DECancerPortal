@@ -41,12 +41,13 @@ if ($q !== '') {
 }
 if ($cancer !== '') { $where[] = 'ct.Cancer_Name = :cancer';  $params[':cancer'] = $cancer; }
 if ($stage !== '')  { $where[] = 'd.Cancer_Stage = :stage';   $params[':stage']  = $stage; }
-if ($sex !== '')    { $where[] = 'p.Sex = :sex';              $params[':sex']    = $sex; }
+if ($sex !== '')    { $where[] = 'st.Sex_Name = :sex';              $params[':sex']    = $sex; }
 
 $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
 // Each patient is joined to their most recent diagnosis, and that to the cancer type name
 $from = "FROM Patients p
+    LEFT JOIN Sex_Types st ON st.Sex_Type_ID = p.Sex_Type_ID
     LEFT JOIN Diagnosis d ON d.Diagnosis_ID = (
         SELECT d2.Diagnosis_ID FROM Diagnosis d2
         WHERE d2.Patient_ID = p.Patient_ID
@@ -63,7 +64,7 @@ $pages  = max(1, (int) ceil($total / $perPage));
 $page   = min($page, $pages);
 $offset = ($page - 1) * $perPage;
 
-$stmt = $db->prepare("SELECT p.Patient_ID, p.FirstName, p.LastName, p.Sex, p.Country,
+$stmt = $db->prepare("SELECT p.Patient_ID, p.FirstName, p.LastName, st.Sex_Name AS Sex, p.Country,
         TIMESTAMPDIFF(YEAR, p.Date_of_Birth, CURDATE()) AS Age,
         ct.Cancer_Name, d.Cancer_Stage, d.Diagnosis_Status
     $from $whereSql
@@ -74,6 +75,7 @@ $patients = $stmt->fetchAll();
 
 // Options for the filter dropdowns come from the database too
 $cancerOptions = $db->query('SELECT Cancer_Name FROM Cancer_Types ORDER BY Cancer_Name')->fetchAll(PDO::FETCH_COLUMN);
+$sexOptions    = $db->query('SELECT Sex_Name FROM Sex_Types ORDER BY Sex_Type_ID')->fetchAll(PDO::FETCH_COLUMN);
 $stageOptions  = $db->query('SELECT DISTINCT Cancer_Stage FROM Diagnosis WHERE Cancer_Stage IS NOT NULL ORDER BY Cancer_Stage')->fetchAll(PDO::FETCH_COLUMN);
 
 $statusClass = ['confirmed' => 'low', 'suspected' => 'medium', 'ruled_out' => 'neutral'];
@@ -99,8 +101,9 @@ include __DIR__ . '/includes/header.php';
         </select>
         <select name="sex" aria-label="Sex">
           <option value="">All sexes</option>
-          <option<?= $sex === 'Female' ? ' selected' : '' ?>>Female</option>
-          <option<?= $sex === 'Male' ? ' selected' : '' ?>>Male</option>
+          <?php foreach ($sexOptions as $opt): ?>
+            <option<?= $opt === $sex ? ' selected' : '' ?>><?= h($opt) ?></option>
+          <?php endforeach; ?>
         </select>
         <button class="button" type="submit">Search</button>
         <?php if ($filtered): ?><a class="text-link" href="patients.php">Clear</a><?php endif; ?>
