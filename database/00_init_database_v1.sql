@@ -70,17 +70,13 @@ CREATE TABLE Users (
   Password_Hash VARCHAR(255) NOT NULL,        -- PHP password_hash() output
   FirstName     VARCHAR(50)  NOT NULL,
   LastName      VARCHAR(50)  NOT NULL,
-  Role          ENUM('patient','oncologist','researcher','admin') NOT NULL,
-  Speciality    VARCHAR(100) NULL,            -- NULL for patients
-  Patient_ID    INT          NULL,            -- NULL for staff; UNIQUE makes it 1:1
+  Role          ENUM('oncologist','researcher','admin') NOT NULL,
+  Speciality    VARCHAR(100) NULL,
   Is_Active     TINYINT(1)   NOT NULL DEFAULT 1,
   Last_Login    DATETIME     NULL,
   Created_Date  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT uq_users_username   UNIQUE (Username),
   CONSTRAINT uq_users_email      UNIQUE (Email),
-  CONSTRAINT uq_users_patient    UNIQUE (Patient_ID),
-  CONSTRAINT fk_users_patient    FOREIGN KEY (Patient_ID)
-    REFERENCES Patients(Patient_ID) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT chk_users_active    CHECK (Is_Active IN (0,1))
 ) ENGINE=InnoDB;
 

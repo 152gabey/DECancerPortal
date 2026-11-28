@@ -283,25 +283,20 @@ ORDER BY n DESC, Mutation_Type;
 --   ('Synonymous', 3)
 
 -- ------------------------------------------------------------
--- 11a. Login lookup: users and roles (the password hash must start with $2y$)
+-- 11a. Staff accounts and roles (the password hash must start with $2y$)
 -- ------------------------------------------------------------
-SELECT User_ID, Username, Role, Speciality, Patient_ID, LEFT(Password_Hash, 4) AS hash_prefix
+SELECT User_ID, Username, Role, Speciality, LEFT(Password_Hash, 4) AS hash_prefix
 FROM Users
 ORDER BY User_ID;
--- Expected (4 rows):
---   (1, 'admin', 'admin', NULL, NULL, '$2y$')
---   (2, 'researcher1', 'researcher', 'Cancer genomics', NULL, '$2y$')
---   (3, 'oncologist1', 'oncologist', 'Medical oncology', NULL, '$2y$')
---   (4, 'patient1', 'patient', NULL, 1, '$2y$')
+-- Expected (2 rows):
+--   (2, 'researcher1', 'researcher', 'Cancer genomics', '$2y$')
+--   (3, 'oncologist1', 'oncologist', 'Medical oncology', '$2y$')
 
 -- ------------------------------------------------------------
--- 11b. The patient login is linked to a patient record with the same name
+-- 11b. Patient records exist independently from staff user accounts
 -- ------------------------------------------------------------
-SELECT u.Username, u.FirstName, u.LastName, p.Patient_ID, p.FirstName AS patient_first, p.LastName AS patient_last
-FROM Users u
-JOIN Patients p ON p.Patient_ID = u.Patient_ID;
--- Expected (1 row):
---   ('patient1', 'James', 'Hierro', 1, 'James', 'Hierro')
+SELECT COUNT(*) AS clinical_patient_records
+FROM Patients;
 
 -- ------------------------------------------------------------
 -- 12. Build a display label from the biomarker name and unit when needed
@@ -392,4 +387,4 @@ DELETE FROM Patients WHERE Patient_ID = 1;
 
 -- h) Duplicate username -> ERROR 1062
 INSERT INTO Users (Username, Email, Password_Hash, FirstName, LastName, Role)
-VALUES ('admin', 'other@decancer.demo', 'x', 'Test', 'User', 'admin');
+VALUES ('researcher1', 'other@decancer.demo', 'x', 'Test', 'User', 'researcher');
