@@ -103,6 +103,9 @@ Shows sample-uploader and feedback reference counts, then removes the seeded `ad
 ### migrations/07_remove_patient_user_link.sql
 Drops `Users.Patient_ID` and removes `patient` from the `Users.Role` enum. Run only after migration 06 succeeds and no patient-role accounts remain. Patient clinical records are retained.
 
+### migrations/08_remove_user_activity_fields.sql
+Drops the unused account activity fields. Run once on an existing database that still has them.
+
 ## Setup Instructions
 
 ### Using SQLTools (Recommended in VS Code)

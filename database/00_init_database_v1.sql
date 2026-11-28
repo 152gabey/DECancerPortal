@@ -72,12 +72,9 @@ CREATE TABLE Users (
   LastName      VARCHAR(50)  NOT NULL,
   Role          ENUM('oncologist','researcher','admin') NOT NULL,
   Speciality    VARCHAR(100) NULL,
-  Is_Active     TINYINT(1)   NOT NULL DEFAULT 1,
-  Last_Login    DATETIME     NULL,
   Created_Date  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT uq_users_username   UNIQUE (Username),
-  CONSTRAINT uq_users_email      UNIQUE (Email),
-  CONSTRAINT chk_users_active    CHECK (Is_Active IN (0,1))
+  CONSTRAINT uq_users_email      UNIQUE (Email)
 ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------------
