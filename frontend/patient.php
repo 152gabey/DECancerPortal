@@ -14,7 +14,7 @@ function h($value): string            // makes text safe to print inside HTML
 // 1. Which patient? The number after "?id=" in the address
 $id = (int) ($_GET['id'] ?? 0);
 
-$stmt = $db->prepare('SELECT p.Patient_ID, p.FirstName, p.LastName, st.Sex_Name AS Sex, rt.Race_Name AS Race, p.Country,
+$stmt = $db->prepare('SELECT p.Patient_ID, p.FirstName, p.LastName, p.Date_of_Birth, st.Sex_Name AS Sex, rt.Race_Name AS Race, p.Country,
         TIMESTAMPDIFF(YEAR, p.Date_of_Birth, CURDATE()) AS Age
     FROM Patients p
     LEFT JOIN Sex_Types st ON st.Sex_Type_ID = p.Sex_Type_ID
@@ -107,6 +107,7 @@ include __DIR__ . '/includes/header.php';
           <h2><?= h($name) ?></h2>
           <p class="muted-text">Patient ID <?= (int) $patient['Patient_ID'] ?></p>
           <dl class="dl">
+            <div><dt>Date of birth</dt><dd><?= $patient['Date_of_Birth'] ? h(date('j M Y', strtotime($patient['Date_of_Birth']))) : '–' ?></dd></div>
             <div><dt>Sex</dt><dd><?= h($patient['Sex']) ?></dd></div>
             <div><dt>Age</dt><dd><?= h($patient['Age']) ?></dd></div>
             <div><dt>Race</dt><dd><?= h($patient['Race'] ?: '–') ?></dd></div>
