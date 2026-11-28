@@ -383,9 +383,9 @@ VALUES ('TEST-002', 1, 2, 200, 1.0);
 INSERT INTO Samples (Sample_Code, Patient_ID, Uploaded_By, Age_At_Collection, Omega_Score, Mutant_Allele_Frequency)
 VALUES ('TEST-003', 1, 2, 50, 1.0, 150);
 
--- f) Invalid sex value -> ERROR 1265 (Data truncated; needs the default strict SQL mode)
-INSERT INTO Patients (FirstName, LastName, Date_of_Birth, Sex, Race)
-VALUES ('Test', 'Person', '1980-01-01', 'Other', 'Unknown');
+-- f) Invalid sex lookup ID -> foreign-key violation
+INSERT INTO Patients (FirstName, LastName, Date_of_Birth, Sex_Type_ID, Race_Type_ID)
+VALUES ('Test', 'Person', '1980-01-01', 999, 8);
 
 -- g) Delete a patient who still has samples -> ERROR 1451 (ON DELETE RESTRICT)
 DELETE FROM Patients WHERE Patient_ID = 1;
