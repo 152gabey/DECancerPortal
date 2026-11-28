@@ -59,10 +59,9 @@ foreach ($samples as $s) {
 
 // 4. Latest prediction on any of their samples
 $stmt = $db->prepare('SELECT pr.Prediction_ID, pr.Date, pr.Pancancer_Probability, pr.Prediction_Result, pr.Model_Version,
-        s.Sample_Code, u.FirstName AS RanFirst, u.LastName AS RanLast
+        s.Sample_Code
     FROM Predictions pr
     JOIN Samples s ON s.Sample_ID = pr.Sample_ID
-    JOIN Users u ON u.User_ID = pr.User_ID
     WHERE s.Patient_ID = ?
     ORDER BY pr.Date DESC, pr.Prediction_ID DESC LIMIT 1');
 $stmt->execute([$id]);
@@ -149,7 +148,6 @@ include __DIR__ . '/includes/header.php';
                   <span class="pill <?= $prediction['Prediction_Result'] === 'cancer' ? 'high' : 'low' ?>"><?= $prediction['Prediction_Result'] === 'cancer' ? 'Cancer' : 'Cancer-free' ?></span>
                 </div>
                 <div><small>Top organ</small><strong><?= h($topOrgan ?: '–') ?></strong></div>
-                <div><small>Run by</small><strong><?= h($prediction['RanFirst'] . ' ' . $prediction['RanLast']) ?></strong></div>
               </div>
               <p class="meta">Sample <?= h($prediction['Sample_Code']) ?> &middot; <?= h(date('j M Y, H:i', strtotime($prediction['Date']))) ?> &middot; <?= h($prediction['Model_Version']) ?></p>
             <?php else: ?>

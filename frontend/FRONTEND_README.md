@@ -12,11 +12,11 @@ You need PHP 8 and MySQL installed (PHP's MySQL driver, `pdo_mysql`, comes with 
    git checkout website
    ```
 2. **Set up the database** from the `database` branch, if you haven't already: run `00_init_database_v1.sql`, then `01_data_import_v1.sql`.
-3. **Make your private settings file**, from the top folder of the repo:
+3. **Configure database access** in the repository-root `.env` file. If you have not created it yet:
    ```sh
-   cp frontend/includes/config.example.php frontend/includes/config.php
+   cp .env.example .env
    ```
-   Open `frontend/includes/config.php` and put your own MySQL password in. This file is ignored by git, so your password is never uploaded.
+   Set `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_DATABASE`, `MYSQL_USER` and `MYSQL_PASSWORD` there. The PHP frontend and Python model/backend use these same settings, so configure them once.
 4. **Test accounts are ready** after importing `01_data_import_v1.sql`. Passwords are only test credentials:
 
    | Username | Role | Password |
