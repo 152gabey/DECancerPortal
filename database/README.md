@@ -91,6 +91,9 @@ one-based IDs in `Sex_Types` and `Race_Types`, and inserts patients using
 
 After that verification, run `migrations/03_drop_legacy_mutation_columns.sql` to remove `Mutation_Detail`, `Position`, and their old index.
 
+### migrations/04_drop_model_feature_name.sql
+Removes the generated `Biomarkers.Model_Feature_Name` column after the CLI and SQL examples have been updated. Run once on a database that still has the column.
+
 ## Setup Instructions
 
 ### Using SQLTools (Recommended in VS Code)

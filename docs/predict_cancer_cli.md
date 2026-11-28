@@ -114,7 +114,7 @@ The tool requires:
    - `Samples` table with `Sample_ID`, `Sample_Code`, `Patient_ID`
    - `Patients` table with `Patient_ID`, `Race_Type_ID`, `Sex_Type_ID`
    - `Biomarker_Measurements` table with features
-   - `Biomarkers` table with `Model_Feature_Name`
+   - `Biomarkers` table with `Biomarker_ID`, `Name`, and `Unit`
 
 ## Output
 

@@ -143,8 +143,6 @@ CREATE TABLE Biomarkers (
   Name               VARCHAR(60) NOT NULL,
   Unit               VARCHAR(10) NOT NULL,
   Category           VARCHAR(20) NOT NULL DEFAULT 'protein',
-  Model_Feature_Name VARCHAR(80)
-    GENERATED ALWAYS AS (CONCAT(Name, ' (', Unit, ')')) STORED,
   CONSTRAINT uq_biomarkers_name UNIQUE (Name)
 ) ENGINE=InnoDB;
 

@@ -119,15 +119,15 @@ ORDER BY rt.Race_Name, st.Sex_Name;
 --   ('Black', 'Female', 62)
 
 -- ------------------------------------------------------------
--- 5. Biomarkers in model order (generated Model_Feature_Name column)
+-- 5. Biomarkers and units in model feature order
 -- ------------------------------------------------------------
-SELECT Biomarker_ID, Model_Feature_Name
+SELECT Biomarker_ID, Name, Unit
 FROM Biomarkers
 ORDER BY Biomarker_ID;
 -- Expected: 39 rows, first 3:
---   (1, 'AFP (pg/ml)')
---   (2, 'Angiopoietin-2 (pg/ml)')
---   (3, 'AXL (pg/ml)')
+--   (1, 'AFP', 'pg/ml')
+--   (2, 'Angiopoietin-2', 'pg/ml')
+--   (3, 'AXL', 'pg/ml')
 
 -- ------------------------------------------------------------
 -- 6. Overview of prediction information
@@ -164,16 +164,15 @@ ORDER BY likelihood DESC
 -- ------------------------------------------------------------
 -- 7. Model input: the 39 protein values of one sample, in model order
 -- ------------------------------------------------------------
-SELECT b.Model_Feature_Name, m.Value
+SELECT m.Value
 FROM Biomarker_Measurements m
 JOIN Samples s ON s.Sample_ID = m.Sample_ID
-JOIN Biomarkers b ON b.Biomarker_ID = m.Biomarker_ID
 WHERE s.Sample_Code = 'CRC 456 PLS 1'
-ORDER BY b.Biomarker_ID;
+ORDER BY m.Biomarker_ID;
 -- Expected: 39 rows, first 3:
---   ('AFP (pg/ml)', 715.308)
---   ('Angiopoietin-2 (pg/ml)', 20936.35)
---   ('AXL (pg/ml)', 2772.96)
+--   (715.308)
+--   (20936.35)
+--   (2772.96)
 
 -- ------------------------------------------------------------
 -- 8. Model input: Race, Sex, Omega score and Age of the same sample
@@ -305,9 +304,9 @@ JOIN Patients p ON p.Patient_ID = u.Patient_ID;
 --   ('patient1', 'James', 'Hierro', 1, 'James', 'Hierro')
 
 -- ------------------------------------------------------------
--- 12. Generated column: CA-125 must read 'CA-125 (U/ml)'
+-- 12. Build a display label from the biomarker name and unit when needed
 -- ------------------------------------------------------------
-SELECT Biomarker_ID, Name, Unit, Model_Feature_Name
+SELECT Biomarker_ID, Name, Unit, CONCAT(Name, ' (', Unit, ')') AS Display_Label
 FROM Biomarkers
 WHERE Name = 'CA-125';
 -- Expected (1 row):

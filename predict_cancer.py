@@ -134,12 +134,11 @@ def get_sample_inputs(connection, sample_code: str) -> list[float]:
 
     try:
         cur.execute(f"""
-        SELECT b.Model_Feature_Name, m.Value
+        SELECT m.Value
         FROM Biomarker_Measurements m
         JOIN Samples s ON s.Sample_ID = m.Sample_ID
-        JOIN Biomarkers b ON b.Biomarker_ID = m.Biomarker_ID
         WHERE s.Sample_Code = '{sample_code}'
-        ORDER BY b.Biomarker_ID;
+        ORDER BY m.Biomarker_ID;
         """)
         proteins = cur.fetchall()
 
@@ -151,7 +150,7 @@ def get_sample_inputs(connection, sample_code: str) -> list[float]:
         """)
         categorical = cur.fetchone()
 
-        features = [p[1] for p in proteins] + [c for c in categorical] if categorical else []
+        features = [p[0] for p in proteins] + [c for c in categorical] if categorical else []
         return features
     finally:
         cur.close()
