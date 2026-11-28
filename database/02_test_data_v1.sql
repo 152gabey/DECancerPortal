@@ -86,6 +86,18 @@ WHERE TIMESTAMPDIFF(YEAR, p.Date_of_Birth, s.Collection_Date) <> s.Age_At_Collec
 -- Expected: age_mismatches = 0
 
 -- ------------------------------------------------------------
+-- 2f. Integrity: diagnosis samples belong to the same patient (should return no rows)
+-- ------------------------------------------------------------
+SELECT d.Diagnosis_ID,
+       d.Patient_ID AS Diagnosis_Patient_ID,
+       d.Sample_ID,
+       s.Patient_ID AS Sample_Patient_ID
+FROM Diagnosis d
+JOIN Samples s ON s.Sample_ID = d.Sample_ID
+WHERE d.Patient_ID <> s.Patient_ID;
+-- Expected: no rows
+
+-- ------------------------------------------------------------
 -- 3. Patients per cancer type
 -- ------------------------------------------------------------
 SELECT ct.Cancer_Name, COUNT(*) AS n_patients
@@ -119,15 +131,15 @@ ORDER BY rt.Race_Name, st.Sex_Name;
 --   ('Black', 'Female', 62)
 
 -- ------------------------------------------------------------
--- 5. Biomarkers in model order (generated Model_Feature_Name column)
+-- 5. Biomarkers and units in model feature order
 -- ------------------------------------------------------------
-SELECT Biomarker_ID, Model_Feature_Name
+SELECT Biomarker_ID, Name, Unit
 FROM Biomarkers
 ORDER BY Biomarker_ID;
 -- Expected: 39 rows, first 3:
---   (1, 'AFP (pg/ml)')
---   (2, 'Angiopoietin-2 (pg/ml)')
---   (3, 'AXL (pg/ml)')
+--   (1, 'AFP', 'pg/ml')
+--   (2, 'Angiopoietin-2', 'pg/ml')
+--   (3, 'AXL', 'pg/ml')
 
 -- ------------------------------------------------------------
 -- 6. Overview of prediction information
@@ -164,16 +176,15 @@ ORDER BY likelihood DESC
 -- ------------------------------------------------------------
 -- 7. Model input: the 39 protein values of one sample, in model order
 -- ------------------------------------------------------------
-SELECT b.Model_Feature_Name, m.Value
+SELECT m.Value
 FROM Biomarker_Measurements m
 JOIN Samples s ON s.Sample_ID = m.Sample_ID
-JOIN Biomarkers b ON b.Biomarker_ID = m.Biomarker_ID
 WHERE s.Sample_Code = 'CRC 456 PLS 1'
-ORDER BY b.Biomarker_ID;
+ORDER BY m.Biomarker_ID;
 -- Expected: 39 rows, first 3:
---   ('AFP (pg/ml)', 715.308)
---   ('Angiopoietin-2 (pg/ml)', 20936.35)
---   ('AXL (pg/ml)', 2772.96)
+--   (715.308)
+--   (20936.35)
+--   (2772.96)
 
 -- ------------------------------------------------------------
 -- 8. Model input: Race, Sex, Omega score and Age of the same sample
@@ -204,7 +215,8 @@ WHERE p.Patient_ID = 1;
 -- ------------------------------------------------------------
 -- 10a. Filter by gene: patients with a KRAS mutation (first 10 shown)
 -- ------------------------------------------------------------
-SELECT p.Patient_ID, p.FirstName, p.LastName, s.Mutation_Gene, s.Mutation_Detail, s.Chromosome
+SELECT p.Patient_ID, p.FirstName, p.LastName, s.Mutation_Gene,
+       s.Protein_Change, s.Coding_Change, s.Genomic_Change, s.Chromosome
 FROM Samples s
 JOIN Patients p ON p.Patient_ID = s.Patient_ID
 WHERE s.Mutation_Gene = 'KRAS'
@@ -215,10 +227,10 @@ LIMIT 10;
 -- ------------------------------------------------------------
 -- 10b. Patients with the same mutation (TP53 p.R248Q)
 -- ------------------------------------------------------------
-SELECT p.Patient_ID, p.FirstName, p.LastName, s.Mutation_Detail
+SELECT p.Patient_ID, p.FirstName, p.LastName, s.Protein_Change, s.Coding_Change
 FROM Samples s
 JOIN Patients p ON p.Patient_ID = s.Patient_ID
-WHERE s.Mutation_Gene = 'TP53' AND s.Mutation_Detail LIKE 'p.R248Q%'
+WHERE s.Mutation_Gene = 'TP53' AND s.Protein_Change = 'p.R248Q'
 ORDER BY p.Patient_ID
 LIMIT 10;
 -- Expected: 15 matching rows in total (first 10 shown)
@@ -233,11 +245,11 @@ WHERE Chromosome = '17';
 --   (1315)
 
 -- ------------------------------------------------------------
--- 10d. Filter by position (only splice-site rows have a position)
+-- 10d. Count records with genomic HGVS notation (splice-site variants)
 -- ------------------------------------------------------------
-SELECT COUNT(*) AS samples_with_position
+SELECT COUNT(*) AS samples_with_genomic_change
 FROM Samples
-WHERE Position IS NOT NULL;
+WHERE Genomic_Change IS NOT NULL;
 -- Expected (1 row):
 --   (40)
 
@@ -283,30 +295,25 @@ ORDER BY n DESC, Mutation_Type;
 --   ('Synonymous', 3)
 
 -- ------------------------------------------------------------
--- 11a. Login lookup: users and roles (the password hash must start with $2y$)
+-- 11a. Staff accounts and roles (the password hash must start with $2y$)
 -- ------------------------------------------------------------
-SELECT User_ID, Username, Role, Speciality, Patient_ID, LEFT(Password_Hash, 4) AS hash_prefix
+SELECT User_ID, Username, Role, Speciality, LEFT(Password_Hash, 4) AS hash_prefix
 FROM Users
 ORDER BY User_ID;
--- Expected (4 rows):
---   (1, 'admin', 'admin', NULL, NULL, '$2y$')
---   (2, 'researcher1', 'researcher', 'Cancer genomics', NULL, '$2y$')
---   (3, 'oncologist1', 'oncologist', 'Medical oncology', NULL, '$2y$')
---   (4, 'patient1', 'patient', NULL, 1, '$2y$')
+-- Expected (2 rows):
+--   (2, 'researcher1', 'researcher', 'Cancer genomics', '$2y$')
+--   (3, 'oncologist1', 'oncologist', 'Medical oncology', '$2y$')
 
 -- ------------------------------------------------------------
--- 11b. The patient login is linked to a patient record with the same name
+-- 11b. Patient records exist independently from staff user accounts
 -- ------------------------------------------------------------
-SELECT u.Username, u.FirstName, u.LastName, p.Patient_ID, p.FirstName AS patient_first, p.LastName AS patient_last
-FROM Users u
-JOIN Patients p ON p.Patient_ID = u.Patient_ID;
--- Expected (1 row):
---   ('patient1', 'James', 'Hierro', 1, 'James', 'Hierro')
+SELECT COUNT(*) AS clinical_patient_records
+FROM Patients;
 
 -- ------------------------------------------------------------
--- 12. Generated column: CA-125 must read 'CA-125 (U/ml)'
+-- 12. Build a display label from the biomarker name and unit when needed
 -- ------------------------------------------------------------
-SELECT Biomarker_ID, Name, Unit, Model_Feature_Name
+SELECT Biomarker_ID, Name, Unit, CONCAT(Name, ' (', Unit, ')') AS Display_Label
 FROM Biomarkers
 WHERE Name = 'CA-125';
 -- Expected (1 row):
@@ -318,9 +325,9 @@ WHERE Name = 'CA-125';
 -- ------------------------------------------------------------
 START TRANSACTION;
 
--- researcher1 (User 2) runs the model on sample 1
-INSERT INTO Predictions (Sample_ID, User_ID, Pancancer_Probability, Prediction_Result, Model_Version)
-VALUES (1, 2, 0.93, 'cancer', 'DeCancer v1.0');
+-- Save a test prediction for sample 1
+INSERT INTO Predictions (Sample_ID, Pancancer_Probability, Prediction_Result, Model_Version)
+VALUES (1, 0.93, 'cancer', 'DeCancer v1.0');
 SET @pid = LAST_INSERT_ID();
 
 -- one score per cancer type (Cancer_ID 2-9 = Breast ... Stomach)
@@ -372,8 +379,8 @@ INSERT INTO Samples (Sample_Code, Patient_ID, Uploaded_By, Age_At_Collection, Om
 VALUES ('TEST-001', 999999, 2, 50, 1.0);
 
 -- c) Probability above 1 -> ERROR 3819 (check constraint chk_pred_prob)
-INSERT INTO Predictions (Sample_ID, User_ID, Pancancer_Probability, Prediction_Result, Model_Version)
-VALUES (1, 2, 1.5, 'cancer', 'test');
+INSERT INTO Predictions (Sample_ID, Pancancer_Probability, Prediction_Result, Model_Version)
+VALUES (1, 1.5, 'cancer', 'test');
 
 -- d) Age outside 0-120 -> ERROR 3819 (check constraint chk_samples_age)
 INSERT INTO Samples (Sample_Code, Patient_ID, Uploaded_By, Age_At_Collection, Omega_Score)
@@ -392,4 +399,4 @@ DELETE FROM Patients WHERE Patient_ID = 1;
 
 -- h) Duplicate username -> ERROR 1062
 INSERT INTO Users (Username, Email, Password_Hash, FirstName, LastName, Role)
-VALUES ('admin', 'other@decancer.demo', 'x', 'Test', 'User', 'admin');
+VALUES ('researcher1', 'other@decancer.demo', 'x', 'Test', 'User', 'researcher');

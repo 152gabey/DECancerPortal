@@ -34,8 +34,8 @@ include __DIR__ . '/includes/header.php';
         <ol class="steps">
           <li><strong>Find or add a patient.</strong> Open <a href="patients.php">Patients</a> to search the records, or add a new patient.</li>
           <li><strong>Look at their blood results.</strong> A patient's page shows each sample and compares every protein with the average of cancer-free patients.</li>
-          <li><strong>Run a prediction.</strong> On <a href="predict.php">Predict</a>, enter the protein values, age, sex, race and &Omega; score, or upload a file, then press <em>Run prediction</em>.</li>
-          <li><strong>Read the result,</strong> then tell the system whether you think it was right. Your feedback is saved and can help improve the model later.</li>
+          <li><strong>Run a prediction.</strong> On <a href="predict.php">Predict</a>, select an existing patient, enter the sample details and all 39 biomarker values (or import them from a CSV). After saving, enter the displayed Sample_ID in the prediction form to run the model.</li>
+          <li><strong>Read the result and give feedback.</strong> The portal shows pancancer and cancer-specific scores; you can submit one feedback response for each prediction. These are research outputs, not a clinical diagnosis.</li>
           <li><strong>Explore patterns.</strong> The <a href="index.php">Dashboard</a> shows how a chosen protein differs between cancer types.</li>
         </ol>
       </section>

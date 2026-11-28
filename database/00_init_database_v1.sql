@@ -70,18 +70,11 @@ CREATE TABLE Users (
   Password_Hash VARCHAR(255) NOT NULL,        -- PHP password_hash() output
   FirstName     VARCHAR(50)  NOT NULL,
   LastName      VARCHAR(50)  NOT NULL,
-  Role          ENUM('patient','oncologist','researcher','admin') NOT NULL,
-  Speciality    VARCHAR(100) NULL,            -- NULL for patients
-  Patient_ID    INT          NULL,            -- NULL for staff; UNIQUE makes it 1:1
-  Is_Active     TINYINT(1)   NOT NULL DEFAULT 1,
-  Last_Login    DATETIME     NULL,
+  Role          ENUM('oncologist','researcher','admin') NOT NULL,
+  Speciality    VARCHAR(100) NULL,
   Created_Date  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT uq_users_username   UNIQUE (Username),
-  CONSTRAINT uq_users_email      UNIQUE (Email),
-  CONSTRAINT uq_users_patient    UNIQUE (Patient_ID),
-  CONSTRAINT fk_users_patient    FOREIGN KEY (Patient_ID)
-    REFERENCES Patients(Patient_ID) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT chk_users_active    CHECK (Is_Active IN (0,1))
+  CONSTRAINT uq_users_email      UNIQUE (Email)
 ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------------
@@ -89,7 +82,7 @@ CREATE TABLE Users (
 -- ------------------------------------------------------------
 CREATE TABLE Samples (
   Sample_ID               INT AUTO_INCREMENT PRIMARY KEY,
-  Sample_Code             VARCHAR(30) NOT NULL,   -- 'Sample ID #'
+  Sample_Code             VARCHAR(30) NULL,       -- Optional external identifier
   Patient_ID              INT         NOT NULL,
   Uploaded_By             INT         NOT NULL,
   Collection_Date         DATE        NULL,
@@ -97,12 +90,14 @@ CREATE TABLE Samples (
   Age_At_Collection       INT         NOT NULL,   -- model input: Age
   Omega_Score             DOUBLE      NOT NULL,   -- model input: Ω score
   Mutation_Gene           VARCHAR(30) NULL,
-  Mutation_Detail          VARCHAR(100) NULL, -- original text, e.g. 'p.R248Q, c.743G>A'
   Mutation_Type           VARCHAR(50) NULL,
+  Protein_Change          VARCHAR(50) NULL,
+  Coding_Change           VARCHAR(50) NULL,
+  Genomic_Change          VARCHAR(100) NULL,
   Chromosome              VARCHAR(5)  NULL,
-  Position                BIGINT      NULL,
   Mutant_Allele_Frequency DOUBLE      NULL,       -- percent (0-100), as in CancerSEEK
   CONSTRAINT uq_samples_code     UNIQUE (Sample_Code),
+  CONSTRAINT uq_samples_patient_sample UNIQUE (Patient_ID, Sample_ID),
   CONSTRAINT fk_samples_patient  FOREIGN KEY (Patient_ID)
     REFERENCES Patients(Patient_ID) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT fk_samples_user     FOREIGN KEY (Uploaded_By)
@@ -110,8 +105,7 @@ CREATE TABLE Samples (
   CONSTRAINT chk_samples_age     CHECK (Age_At_Collection BETWEEN 0 AND 120),
   CONSTRAINT chk_samples_maf     CHECK (Mutant_Allele_Frequency IS NULL
                                         OR Mutant_Allele_Frequency BETWEEN 0 AND 100),
-  INDEX idx_samples_mut_gene (Mutation_Gene),
-  INDEX idx_samples_mut_pos  (Chromosome, Position)
+  INDEX idx_samples_mut_gene (Mutation_Gene)
 ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------------
@@ -131,8 +125,8 @@ CREATE TABLE Diagnosis (
     REFERENCES Patients(Patient_ID) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT fk_diag_cancer  FOREIGN KEY (Cancer_ID)
     REFERENCES Cancer_Types(Cancer_ID) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT fk_diag_sample  FOREIGN KEY (Sample_ID)
-    REFERENCES Samples(Sample_ID) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_diag_sample_patient FOREIGN KEY (Patient_ID, Sample_ID)
+    REFERENCES Samples(Patient_ID, Sample_ID) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------------
@@ -143,8 +137,6 @@ CREATE TABLE Biomarkers (
   Name               VARCHAR(60) NOT NULL,
   Unit               VARCHAR(10) NOT NULL,
   Category           VARCHAR(20) NOT NULL DEFAULT 'protein',
-  Model_Feature_Name VARCHAR(80)
-    GENERATED ALWAYS AS (CONCAT(Name, ' (', Unit, ')')) STORED,
   CONSTRAINT uq_biomarkers_name UNIQUE (Name)
 ) ENGINE=InnoDB;
 
@@ -170,18 +162,14 @@ CREATE TABLE Biomarker_Measurements (
 CREATE TABLE Predictions (
   Prediction_ID             INT AUTO_INCREMENT PRIMARY KEY,
   Sample_ID                 INT         NOT NULL,
-  User_ID                   INT         NOT NULL,   -- ran_by (set by PHP)
   Date                      DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,  -- timestamp
   Pancancer_Probability     DOUBLE      NOT NULL,
   Prediction_Result         ENUM('cancer','cancer-free') NOT NULL,
-  Missing_Cancer_Score      DOUBLE      NULL,       -- meaning to be confirmed
   Highest_Protein_Influence DOUBLE      NULL,
   Highest_Biomarker_ID      INT         NULL,
   Model_Version             VARCHAR(30) NOT NULL,
   CONSTRAINT fk_pred_sample    FOREIGN KEY (Sample_ID)
     REFERENCES Samples(Sample_ID) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT fk_pred_user      FOREIGN KEY (User_ID)
-    REFERENCES Users(User_ID) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT fk_pred_biomarker FOREIGN KEY (Highest_Biomarker_ID)
     REFERENCES Biomarkers(Biomarker_ID) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT chk_pred_prob     CHECK (Pancancer_Probability BETWEEN 0 AND 1)

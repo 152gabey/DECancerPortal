@@ -1,42 +1,39 @@
 # DECancer Portal: website (frontend) review guide
 
-This folder holds the website for the DECancer portal. It is written in PHP, HTML and CSS and reads from Anna's MySQL database (`decancer_portal`). This guide explains how to run it, how to sign in, and what to look at on each page.
+This folder holds the DECancer portal website. It is written in PHP, HTML and CSS and reads from the configured MySQL database (`decancer_portal`). This guide explains how to run it, sign in, and explore the pages.
 
 ## 1. Run it on your computer
 
 You need PHP 8 and MySQL installed (PHP's MySQL driver, `pdo_mysql`, comes with the usual installs).
 
-1. **Get the branch**
+1. **Use a checkout containing this frontend and the `database/` directory.**
+2. **Set up the database** if you haven't already: run `database/00_init_database_v1.sql`, then `database/01_data_import_v1.sql`. For an existing database, see the migration notes in `database/README.md`.
+3. **Configure database access** in the repository-root `.env` file. If you have not created it yet:
    ```sh
-   git fetch
-   git checkout website
+   cp .env.example .env
    ```
-2. **Set up the database** from the `database` branch, if you haven't already: run `00_init_database_v1.sql`, then `01_data_import_v1.sql`.
-3. **Make your private settings file**, from the top folder of the repo:
-   ```sh
-   cp frontend/includes/config.example.php frontend/includes/config.php
-   ```
-   Open `frontend/includes/config.php` and put your own MySQL password in. This file is ignored by git, so your password is never uploaded.
-4. **Set test passwords** (the database stores only scrambled hashes, so we set our own on each local copy):
-   ```sh
-   php frontend/tools/set_password.php researcher1 'TestPassword123'
-   php frontend/tools/set_password.php oncologist1 'TestPassword123'
-   ```
-   Re-running Anna's `01` import script resets these, so run the commands again afterwards.
+   Set `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_DATABASE`, `MYSQL_USER` and `MYSQL_PASSWORD` there. The PHP frontend and Python model/backend use these same settings, so configure them once.
+4. **Test accounts are ready** after importing `01_data_import_v1.sql`. Passwords are only test credentials:
+
+   | Username | Role | Password |
+   |---|---|---|
+   | `researcher1` | Researcher | `TestPassword123` |
+   | `oncologist1` | Oncologist | `TestPassword123` |
+
+   Do not use these credentials or expose this database on a public network in production.
 5. **Start the website**, from the top folder of the repo:
    ```sh
-   php -S localhost:8000 -t frontend
+   php -S 127.0.0.1:3000 -t frontend
    ```
-6. Open <http://localhost:8000/login.php>.
+6. Open <http://127.0.0.1:3000/login.php>.
+
 
 ## 2. Accounts to try
 
 | Username | Role | Password | What to expect |
 |---|---|---|---|
-| `researcher1` | Researcher | `TestPassword123` (after step 4) | Sees everything, including **Trends** and the **Top influence** card on the dashboard |
-| `oncologist1` | Oncologist | `TestPassword123` (after step 4) | No **Trends** link and no **Top influence** card |
-| `admin` | Admin | set it the same way if you want to use it | Same view as a researcher |
-| `patient1` | Patient | (any) | **Refused.** Patients can't sign in, so you should see "Incorrect username or password" |
+| `researcher1` | Researcher | `TestPassword123` | Sees everything, including **Trends** and the **Top influence** card on the dashboard |
+| `oncologist1` | Oncologist | `TestPassword123` | No **Trends** link and no **Top influence** card |
 
 These are throwaway passwords for local test copies of the database. Don't reuse a real password anywhere in this project.
 
@@ -44,28 +41,28 @@ These are throwaway passwords for local test copies of the database. Don't reuse
 
 | Page | What it does | Real data or placeholder |
 |---|---|---|
-| **Login** (`login.php`) | Checks the username and password against the `Users` table. Wrong details, switched-off accounts and patients all get the same error. | Real |
-| **Dashboard** (`index.php`) | Four count tiles, a bar chart of one protein's average level per cancer type (pick a protein and press *Show*), recent predictions, prediction results, recent patients, and (researchers only) top influence. | Real. Prediction tables will say "No predictions have been run yet" until predictions exist. |
+| **Login** (`login.php`) | Checks the username and password against the `Users` table. Wrong details and disallowed roles get the same error. | Real |
+| **Dashboard** (`index.php`) | Four count tiles, a bar chart of one protein's average level per cancer type (pick a protein and press *Show*), recent predictions, prediction results, recent patients, and (researchers and admins) top influence. | Real. Prediction tables will say "No predictions have been run yet" until predictions exist. |
 | **Patients** (`patients.php`) | Search by name or ID, filter by cancer type, stage and sex, 15 per page. | Real |
-| **Patient detail** (`patient.php?id=...`) | Profile, latest diagnosis, latest prediction, all samples (click a sample code to switch), and all 39 biomarkers compared with the cancer-free average. | Real |
+| **Patient detail** (`patient.php?id=...`) | Profile, latest diagnosis, latest prediction, all samples (select a sample ID to switch), and all 39 biomarkers compared with the cancer-free average. Sample ID is shown separately from the optional sample code. | Real |
 | **Add a patient** (`add_patient.php`) | Creates a new patient record, then opens their page. Try leaving fields empty to see the checks. | Real. It writes to your local database. |
-| **Predict** (`predict.php`) | The 39 biomarker inputs, patient details, a file upload, a results panel and feedback buttons. | **Design only.** The buttons don't do anything yet and the results panel shows example numbers. |
-| **Biomarkers** | Placeholder card. | Placeholder |
-| **Trends** (researchers only) | Placeholder card. Oncologists get "You do not have access to this page." | Placeholder |
-| **Model performance** | Placeholder card, waiting for evaluation charts. | Placeholder |
+| **Predict** (`predict.php`) | Enter or import one sample's 39 biomarker measurements for an existing patient and save it, optionally providing an external sample code. The generated `Sample_ID` is used to run the model. Results, a link to the patient's details for that sample, and prediction feedback appear beside the saved-sample form. CSV template headers include units. | Real. Requires the FastAPI service and configured model files. |
+| **Biomarkers** (`biomarkers.php`) | Search the 39 proteins and compare average levels by diagnosis. Purple shading marks cancer averages more than 1.5 times the cancer-free average; select a protein to chart it on the dashboard. | Real |
+| **Trends** (`trends.php`) (researchers and admins) | Reserved for trends over time and between cancer types. Oncologists do not have access. | Placeholder |
+| **Model performance** (`model.php`) | Select a cancer model to view its test-set ROC curve, confusion matrix, AUC, precision, recall, accuracy and F1 score, with a comparison table for all models. Training-set metrics are not shown. | Precomputed test results and figures |
 | **About** (`about.php`) | What a liquid biopsy is, what the model uses, how to use the portal and how to read a result. | Text |
 
 ## 4. Quick checks worth doing
 
-- Open `http://localhost:8000/patients.php` while signed out. It should send you to the login page.
-- Sign in as `oncologist1` and type `http://localhost:8000/trends.php` into the address bar. It should be blocked.
+- Open `http://127.0.0.1:3000/patients.php` while signed out. It should send you to the login page.
+- Sign in as `oncologist1` and type `http://127.0.0.1:3000/trends.php` into the address bar. It should be blocked.
 - Add a patient, then find them in the Patients list.
 - Shrink the browser window. The sidebar should turn into a Menu button.
 
 
 ## 6. Known limitations
 
-- Predict is not connected to the model yet.
-- The Biomarkers, Trends and Model performance pages are placeholders.
+- CSV import requires exactly one sample row and one column per biomarker, using the downloadable template's headers. Each header includes the protein's unit; enter numeric values in those units. The same measurements can instead be entered in the form.
+- Trends is a placeholder. Model performance shows precomputed test-set results; training-set metrics are not available on the page.
 - There is no JavaScript or AJAX yet. The dashboard dropdown reloads the page.
-- There's no way to add a diagnosis or a sample from the website yet.
+- There is no way to add a diagnosis from the website yet.
