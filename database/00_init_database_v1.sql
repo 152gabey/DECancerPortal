@@ -97,6 +97,7 @@ CREATE TABLE Samples (
   Chromosome              VARCHAR(5)  NULL,
   Mutant_Allele_Frequency DOUBLE      NULL,       -- percent (0-100), as in CancerSEEK
   CONSTRAINT uq_samples_code     UNIQUE (Sample_Code),
+  CONSTRAINT uq_samples_patient_sample UNIQUE (Patient_ID, Sample_ID),
   CONSTRAINT fk_samples_patient  FOREIGN KEY (Patient_ID)
     REFERENCES Patients(Patient_ID) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT fk_samples_user     FOREIGN KEY (Uploaded_By)
@@ -124,8 +125,8 @@ CREATE TABLE Diagnosis (
     REFERENCES Patients(Patient_ID) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT fk_diag_cancer  FOREIGN KEY (Cancer_ID)
     REFERENCES Cancer_Types(Cancer_ID) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT fk_diag_sample  FOREIGN KEY (Sample_ID)
-    REFERENCES Samples(Sample_ID) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_diag_sample_patient FOREIGN KEY (Patient_ID, Sample_ID)
+    REFERENCES Samples(Patient_ID, Sample_ID) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------------

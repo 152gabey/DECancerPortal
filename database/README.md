@@ -38,6 +38,7 @@ This directory contains MySQL initialization and data import scripts for the DEC
 - `Samples.Sample_ID` is the generated identifier used for predictions; `Samples.Sample_Code` is an optional, unique external code
 - `Diagnosis.Patient_ID` → `Patients.Patient_ID` (required)
 - `Diagnosis.Cancer_ID` → `Cancer_Types.Cancer_ID` (required)
+- `Diagnosis` (`Patient_ID`, `Sample_ID`) → `Samples` (`Patient_ID`, `Sample_ID`) (optional sample; the sample must belong to the diagnosis patient)
 - `Biomarker_Measurements.Sample_ID` → `Samples.Sample_ID` (required)
 
 **Run first:** Yes, before any data import
@@ -117,6 +118,9 @@ Drops the unused account activity fields. Run once on an existing database that 
 ### migrations/09_make_sample_code_optional.sql
 Allows `Samples.Sample_Code` to be `NULL` when no external sample code is available. The generated `Sample_ID` remains the identifier used to run predictions; existing sample codes and the unique constraint are preserved. Run once on an existing database after backing it up.
 
+### migrations/10_enforce_diagnosis_sample_patient_match.sql
+Ensures a diagnosis can reference only a sample belonging to the same patient. Before running the migration, execute its preflight `SELECT` and confirm it returns no rows; resolve any existing mismatches first. The migration replaces the single-column sample foreign key with a composite foreign key and restricts deletion of samples referenced by diagnoses.
+
 ## Setup Instructions
 
 ### Using SQLTools (Recommended in VS Code)
@@ -158,6 +162,14 @@ If you have an existing database with the old `Sex` and `Race` columns, run the 
 ```bash
 mysql -h 127.0.0.1 -u root -p decancer_portal < migrations/01_add_race_sex_types_v1.sql
 ```
+
+For a database that has already been updated through migration 09, run the preflight query at the top of migration 10 separately and confirm it returns no rows. Then apply the migration:
+
+```bash
+mysql -h 127.0.0.1 -u root -p decancer_portal < migrations/10_enforce_diagnosis_sample_patient_match.sql
+```
+
+Deleting a sample linked to a diagnosis is now blocked. Remove or update the diagnosis's sample reference before deleting that sample.
 
 ## Data Characteristics
 

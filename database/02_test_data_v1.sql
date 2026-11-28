@@ -86,6 +86,18 @@ WHERE TIMESTAMPDIFF(YEAR, p.Date_of_Birth, s.Collection_Date) <> s.Age_At_Collec
 -- Expected: age_mismatches = 0
 
 -- ------------------------------------------------------------
+-- 2f. Integrity: diagnosis samples belong to the same patient (should return no rows)
+-- ------------------------------------------------------------
+SELECT d.Diagnosis_ID,
+       d.Patient_ID AS Diagnosis_Patient_ID,
+       d.Sample_ID,
+       s.Patient_ID AS Sample_Patient_ID
+FROM Diagnosis d
+JOIN Samples s ON s.Sample_ID = d.Sample_ID
+WHERE d.Patient_ID <> s.Patient_ID;
+-- Expected: no rows
+
+-- ------------------------------------------------------------
 -- 3. Patients per cancer type
 -- ------------------------------------------------------------
 SELECT ct.Cancer_Name, COUNT(*) AS n_patients
