@@ -139,11 +139,11 @@ request flow, model inputs, database writes, and local run instructions.
 The standalone prediction tool enables batch processing and automated scheduling:
 
 ```sh
-# Generate predictions for user ID 1 with progress output
-python predict_cancer.py 1 --verbose
+# Generate predictions for configured samples with progress output
+python predict_cancer.py --verbose
 
 # Schedule daily predictions at 2 AM using cron
-# 0 2 * * * cd /path/to/DECancerPortal && python predict_cancer.py 1 >> predictions.log 2>&1
+# 0 2 * * * cd /path/to/DECancerPortal && python predict_cancer.py >> predictions.log 2>&1
 ```
 
 See [docs/predict_cancer_cli.md](docs/predict_cancer_cli.md) for detailed documentation,

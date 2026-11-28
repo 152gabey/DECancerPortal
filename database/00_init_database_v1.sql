@@ -168,18 +168,14 @@ CREATE TABLE Biomarker_Measurements (
 CREATE TABLE Predictions (
   Prediction_ID             INT AUTO_INCREMENT PRIMARY KEY,
   Sample_ID                 INT         NOT NULL,
-  User_ID                   INT         NOT NULL,   -- ran_by (set by PHP)
   Date                      DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,  -- timestamp
   Pancancer_Probability     DOUBLE      NOT NULL,
   Prediction_Result         ENUM('cancer','cancer-free') NOT NULL,
-  Missing_Cancer_Score      DOUBLE      NULL,       -- meaning to be confirmed
   Highest_Protein_Influence DOUBLE      NULL,
   Highest_Biomarker_ID      INT         NULL,
   Model_Version             VARCHAR(30) NOT NULL,
   CONSTRAINT fk_pred_sample    FOREIGN KEY (Sample_ID)
     REFERENCES Samples(Sample_ID) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT fk_pred_user      FOREIGN KEY (User_ID)
-    REFERENCES Users(User_ID) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT fk_pred_biomarker FOREIGN KEY (Highest_Biomarker_ID)
     REFERENCES Biomarkers(Biomarker_ID) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT chk_pred_prob     CHECK (Pancancer_Probability BETWEEN 0 AND 1)

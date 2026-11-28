@@ -24,7 +24,7 @@ This tool **decouples prediction from the backend**, enabling:
 ### 1. **Separation of Concerns**
 - **Model loading**: Isolated `get_model_info()` to load metadata and model paths
 - **Data retrieval**: Dedicated `get_sample_inputs()` to fetch features from the database
-- **Prediction generation**: Core `save_test_data()` logic remains unchanged but improved
+- **Prediction generation**: `save_test_data()` runs without associating results with a user account
 - **CLI interface**: New `main()` function handles argument parsing and user interaction
 
 ### 2. **Robustness & Error Handling**
@@ -53,10 +53,10 @@ This tool **decouples prediction from the backend**, enabling:
 
 ### Basic Usage
 
-Generate predictions for samples using user ID 1:
+Generate predictions for the configured test samples:
 
 ```bash
-python predict_cancer.py 1
+python predict_cancer.py
 ```
 
 ### With Progress Output
@@ -64,13 +64,13 @@ python predict_cancer.py 1
 Display detailed progress information:
 
 ```bash
-python predict_cancer.py 1 --verbose
+python predict_cancer.py --verbose
 ```
 
 or
 
 ```bash
-python predict_cancer.py 1 -v
+python predict_cancer.py -v
 ```
 
 ### Integration with Cron
@@ -78,7 +78,7 @@ python predict_cancer.py 1 -v
 Schedule automated predictions daily at 2 AM:
 
 ```bash
-0 2 * * * cd /path/to/DECancerPortal && python predict_cancer.py 1 >> predictions.log 2>&1
+0 2 * * * cd /path/to/DECancerPortal && python predict_cancer.py >> predictions.log 2>&1
 ```
 
 ### Exit Codes
@@ -126,7 +126,6 @@ Stores overall cancer prediction for each sample:
 | Column | Type | Purpose |
 |--------|------|---------|
 | Sample_ID | INT | Reference to the sample |
-| User_ID | INT | User who generated the prediction |
 | Date | TIMESTAMP | When prediction was generated |
 | Pancancer_Probability | FLOAT | Probability score from pancancer model |
 | Prediction_Result | VARCHAR | "cancer" or "cancer-free" |
@@ -167,8 +166,8 @@ export MYSQL_HOST=localhost
 export MYSQL_DATABASE=decancer
 export MODEL_PATH=Results/test
 
-# 2. Run predictions for user 42
-python predict_cancer.py 42 --verbose
+# 2. Run predictions for configured samples
+python predict_cancer.py --verbose
 
 # 3. Output
 # Loading models for 9 cancer types...

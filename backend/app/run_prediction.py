@@ -155,7 +155,7 @@ def predict_one_model(cancer_type: cs.CancerType, features: list[float]) -> dict
         "highest_biomarker_id": int(protein_importance.argmax()) + 1,
     }
 
-def save_prediction_outputs(connection, sample_id: int, user_id: int, outputs: list[dict]) -> int:
+def save_prediction_outputs(connection, sample_id: int, outputs: list[dict]) -> int:
     """Save an overall result and per-cancer scores in one transaction."""
     if not outputs:
         raise ValueError("Cannot save an empty set of model outputs")
@@ -166,12 +166,11 @@ def save_prediction_outputs(connection, sample_id: int, user_id: int, outputs: l
     try:
         cursor.execute(
             """INSERT INTO Predictions (
-                   Sample_ID, User_ID, Pancancer_Probability, Prediction_Result,
+                   Sample_ID, Pancancer_Probability, Prediction_Result,
                    Highest_Protein_Influence, Highest_Biomarker_ID, Model_Version
-               ) VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+               ) VALUES (%s, %s, %s, %s, %s, %s)""",
             (
                 sample_id,
-                user_id,
                 pancancer["probability"],
                 best["prediction_result"],
                 best["highest_protein_influence"],
@@ -202,14 +201,13 @@ def run_prediction(sample_id: int) -> dict:
     cursor = connection.cursor()
     try:
         cursor.execute(
-            "SELECT Uploaded_By FROM Samples WHERE Sample_ID = %s",
+            "SELECT Sample_ID FROM Samples WHERE Sample_ID = %s",
             (sample_id,),
         )
         sample = cursor.fetchone()
         if not sample:
             raise LookupError(f"Sample_ID {sample_id} was not found")
         features = get_sample_inputs(connection, sample_id)
-        user_id = int(sample[0])
     finally:
         cursor.close()
         connection.close()
@@ -246,7 +244,7 @@ def run_prediction(sample_id: int) -> dict:
     }
     connection = create_connection()
     try:
-        prediction["prediction_id"] = save_prediction_outputs(connection, sample_id, user_id, outputs)
+        prediction["prediction_id"] = save_prediction_outputs(connection, sample_id, outputs)
     finally:
         connection.close()
     return prediction

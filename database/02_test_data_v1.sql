@@ -318,9 +318,9 @@ WHERE Name = 'CA-125';
 -- ------------------------------------------------------------
 START TRANSACTION;
 
--- researcher1 (User 2) runs the model on sample 1
-INSERT INTO Predictions (Sample_ID, User_ID, Pancancer_Probability, Prediction_Result, Model_Version)
-VALUES (1, 2, 0.93, 'cancer', 'DeCancer v1.0');
+-- Save a test prediction for sample 1
+INSERT INTO Predictions (Sample_ID, Pancancer_Probability, Prediction_Result, Model_Version)
+VALUES (1, 0.93, 'cancer', 'DeCancer v1.0');
 SET @pid = LAST_INSERT_ID();
 
 -- one score per cancer type (Cancer_ID 2-9 = Breast ... Stomach)
@@ -372,8 +372,8 @@ INSERT INTO Samples (Sample_Code, Patient_ID, Uploaded_By, Age_At_Collection, Om
 VALUES ('TEST-001', 999999, 2, 50, 1.0);
 
 -- c) Probability above 1 -> ERROR 3819 (check constraint chk_pred_prob)
-INSERT INTO Predictions (Sample_ID, User_ID, Pancancer_Probability, Prediction_Result, Model_Version)
-VALUES (1, 2, 1.5, 'cancer', 'test');
+INSERT INTO Predictions (Sample_ID, Pancancer_Probability, Prediction_Result, Model_Version)
+VALUES (1, 1.5, 'cancer', 'test');
 
 -- d) Age outside 0-120 -> ERROR 3819 (check constraint chk_samples_age)
 INSERT INTO Samples (Sample_Code, Patient_ID, Uploaded_By, Age_At_Collection, Omega_Score)

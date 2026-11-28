@@ -94,6 +94,9 @@ After that verification, run `migrations/03_drop_legacy_mutation_columns.sql` to
 ### migrations/04_drop_model_feature_name.sql
 Removes the generated `Biomarkers.Model_Feature_Name` column after the CLI and SQL examples have been updated. Run once on a database that still has the column.
 
+### migrations/05_simplify_predictions.sql
+Removes the undefined `Predictions.Missing_Cancer_Score` and `Predictions.User_ID` fields, including the user foreign key. Run once on a database that still has both columns, after backing it up.
+
 ## Setup Instructions
 
 ### Using SQLTools (Recommended in VS Code)
