@@ -1,29 +1,30 @@
-# DEcancer Pipelines
+# DECancer Portal and Research Pipelines
 
 ## Repository layout
 
-The original analysis pipelines remain at the repository root and in `src/`.
-The portal stack is organised as follows:
+The research pipelines remain at the repository root and in `src/`. The web
+portal uses PHP, MySQL, and a FastAPI prediction service:
 
 ```text
 backend/
   app/
-    config.py       # environment-based settings
-    database.py     # MySQL Connector/Python connection helpers
-    main.py         # FastAPI application and health endpoints
+    main.py             # FastAPI prediction and health endpoints
+    run_prediction.py   # Saved-sample inference and persistence
 frontend/
-  index.html
-  styles.css
-  app.js
+  *.php                # Authenticated portal pages
+  includes/            # Shared PHP helpers and layout
+  css/style.css
 database/
-  00_init_database_v1.sql          # starter MySQL schema
-  01_data_import_v1.sql            # mockup data for tables
-  02_test_data_v1.sql              # queries
-docker-compose.yml # local MySQL service
+  00_init_database_v1.sql
+  01_data_import_v1.sql
+  02_test_data_v1.sql
+  03_import_predictions.sql
+  migrations/
+docs/
 ```
 
-This separation keeps reproducible research scripts independent from the
-portal service while providing a place to add API routes and client features.
+The research scripts and web portal share the database and trained model
+artifacts, while PHP delegates prediction requests to FastAPI.
 
 # Usage
 
@@ -37,8 +38,7 @@ Copy `.env.example` to `.env` and update credentials for your deployment:
 cp .env.example .env
 ```
 
-For local development, the defaults should work. For non-local deployments,
-update database host, port, username, and password.
+Update the username, and password.
 
 ### 2. Database setup using SQLTools (Recommended)
 
@@ -76,12 +76,15 @@ steps to activate and run the database:
    - This creates the `decancer_portal` database and schema
 5. Repeat for [database/01_data_import_v1.sql](database/01_data_import_v1.sql) to populate test data
 6. Optionally run [database/02_test_data_v1.sql](database/02_test_data_v1.sql) for additional queries
+7. Optionally run [database/03_import_predictions.sql](database/03_import_predictions.sql) after the data import to load precomputed demo predictions; it is not needed to run new predictions.
+   **Warning:** It replaces existing predictions and cascades deletion of their scores and feedback. Only run it on a demo/test database if you are okay losing those records.
 
 #### Verify the database connection
 
 1. In SQLTools explorer, expand your connection
 2. You should see the `decancer_portal` database listed
-3. Expand it to view tables: `Patients`, `Cancer_Types`, `Users`, `Results`, etc.
+3. Expand it to view tables such as `Patients`, `Samples`,
+   `Biomarker_Measurements`, `Predictions`, and `Prediction_Scores`.
 
 **Note:** The data import scripts have been fixed to respect foreign key dependencies.
 Patients must be inserted before Users, Samples, and Diagnosis records. If you're using
@@ -96,6 +99,16 @@ mysql -h 127.0.0.1 -u root -p < database/00_init_database_v1.sql
 mysql -h 127.0.0.1 -u root -p decancer_portal < database/01_data_import_v1.sql
 mysql -h 127.0.0.1 -u root -p decancer_portal < database/02_test_data_v1.sql
 ```
+
+To load demo predictions after the sample data, optionally run:
+
+```sh
+mysql -h 127.0.0.1 -u root -p decancer_portal < database/03_import_predictions.sql
+```
+
+This replaces existing predictions and cascades deletion of their prediction
+scores and feedback. Only run it on a demo/test database if you are okay losing
+those records.
 
 ### 3. Create a Python virtual environment
 
@@ -119,20 +132,18 @@ The API is available at `http://127.0.0.1:8000`. Check:
 - `http://127.0.0.1:8000/api/health` for liveness
 - `http://127.0.0.1:8000/api/health/database` for MySQL connectivity
 
-### 5. Serve the frontend
+### 5. Start the PHP portal
 
 ```sh
-python -m http.server 8080 --directory frontend
+php -S 127.0.0.1:3000 -t frontend
 ```
 
-Open `http://127.0.0.1:8080` in your browser. Configure your server to proxy
-`/api` requests to the FastAPI service at `http://127.0.0.1:8000`, or access
-both from the same origin.
+Open <http://127.0.0.1:3000/login.php>. PHP must have the `pdo_mysql` and
+`curl` extensions enabled. The portal uses `PREDICTION_API_URL` to contact
+FastAPI; it defaults to `http://127.0.0.1:8000`. See
+[docs/model_integration.md](docs/model_integration.md) for the complete
+PHP-to-FastAPI flow.
 
-For the PHP portal and sample-prediction page, use PHP's built-in server instead
-of the static Python server so PHP pages such as `predict.php` are executed. See
-[docs/model_integration.md](docs/model_integration.md) for the PHP-to-FastAPI
-request flow, model inputs, database writes, and local run instructions.
 
 ### Test accounts
 

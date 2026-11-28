@@ -35,6 +35,7 @@ This directory contains MySQL initialization and data import scripts for the DEC
 - `Patients.Race_Type_ID` → `Race_Types.Race_Type_ID` (required)
 - Patient clinical records remain separate from staff login accounts
 - `Samples.Patient_ID` → `Patients.Patient_ID` (required)
+- `Samples.Sample_ID` is the generated identifier used for predictions; `Samples.Sample_Code` is an optional, unique external code
 - `Diagnosis.Patient_ID` → `Patients.Patient_ID` (required)
 - `Diagnosis.Cancer_ID` → `Cancer_Types.Cancer_ID` (required)
 - `Biomarker_Measurements.Sample_ID` → `Samples.Sample_ID` (required)
@@ -63,6 +64,13 @@ This directory contains MySQL initialization and data import scripts for the DEC
 - Reference queries for common operations
 
 **Run:** Optional, after `01_data_import_v1.sql` for testing
+
+### 03_import_predictions.sql
+**Purpose:** Loads precomputed demo predictions and cancer-specific scores so the portal has prediction results to display without running the model.
+
+**Run:** Optional, after `01_data_import_v1.sql`. This script is not required to create the schema or make new predictions through FastAPI.
+
+**Warning:** The script deletes all existing rows from `Prediction_Scores` and `Predictions` before importing its demo data. Deleting predictions also cascades to their `Prediction_Feedback` records. Run it only on a demo/test database if you are okay losing those records.
 
 ### migrations/01_add_race_sex_types_v1.sql
 **Purpose:** Migration script for existing databases
@@ -119,6 +127,7 @@ Allows `Samples.Sample_Code` to be `NULL` when no external sample code is availa
    - `00_init_database_v1.sql` → Creates schema
    - `01_data_import_v1.sql` → Loads test data
    - `02_test_data_v1.sql` → Runs test queries
+   - `03_import_predictions.sql` → Optionally loads precomputed demo predictions; see the warning above
 
 ### Using Command Line
 
@@ -132,6 +141,15 @@ mysql -h 127.0.0.1 -u root -p decancer_portal < 01_data_import_v1.sql
 # Run test queries
 mysql -h 127.0.0.1 -u root -p decancer_portal < 02_test_data_v1.sql
 ```
+
+To load the optional demo predictions after the sample data:
+
+```bash
+mysql -h 127.0.0.1 -u root -p decancer_portal < 03_import_predictions.sql
+```
+
+This replaces existing predictions and cascades deletion of their prediction
+scores and feedback. Do not run it if those records need to be preserved.
 
 ### For Existing Databases
 
