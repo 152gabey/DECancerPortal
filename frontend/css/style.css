@@ -354,3 +354,10 @@ main, .main, .col { grid-template-columns: minmax(0, 1fr); }   /* let the single
 .prose .dl > div { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 1.5rem; justify-content: start; }
 .prose .dl dd { max-width: none; text-align: left; }
 @media (max-width: 700px) { .prose .dl > div { grid-template-columns: minmax(0, 1fr); gap: .2rem; } }
+
+/* ================= Biomarkers page ================= */
+.heat td, .heat th { white-space: nowrap; }
+.heat td:nth-child(n+3) { font-variant-numeric: tabular-nums; }
+.heat td.hi { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+.heat td a { text-decoration: none; }
+.heat td a:hover { color: var(--accent); }
